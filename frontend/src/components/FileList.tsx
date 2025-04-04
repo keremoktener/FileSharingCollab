@@ -10,6 +10,7 @@ interface FileListProps {
 
 const FileList: React.FC<FileListProps> = ({ files, onFileAction }) => {
   const [viewingFile, setViewingFile] = useState<FileInfo | null>(null);
+  const [viewingContent, setViewingContent] = useState<string | null>(null);
 
   const handleDownload = async (fileId: number, fileName: string) => {
     try {
@@ -41,12 +42,32 @@ const FileList: React.FC<FileListProps> = ({ files, onFileAction }) => {
     }
   };
   
-  const handleView = (file: FileInfo) => {
+  const handleView = async (file: FileInfo) => {
     setViewingFile(file);
+    
+    // For direct viewing content types, get a blob URL with proper auth
+    if (file.fileType.startsWith('image/') || 
+        file.fileType.startsWith('video/') || 
+        file.fileType.startsWith('audio/') || 
+        file.fileType === 'application/pdf') {
+      try {
+        const blob = await fileService.viewFile(file.id);
+        const url = URL.createObjectURL(blob);
+        setViewingContent(url);
+      } catch (error) {
+        console.error('Error viewing file:', error);
+        toast.error('Failed to load file preview');
+      }
+    }
   };
   
   const closePreview = () => {
     setViewingFile(null);
+    // Revoke any object URLs to prevent memory leaks
+    if (viewingContent) {
+      URL.revokeObjectURL(viewingContent);
+      setViewingContent(null);
+    }
   };
 
   // Format file size to human-readable format
@@ -171,25 +192,25 @@ const FileList: React.FC<FileListProps> = ({ files, onFileAction }) => {
             <div className="flex-1 overflow-auto">
               {viewingFile.fileType.startsWith('image/') ? (
                 <img 
-                  src={fileService.getFileViewUrl(viewingFile.id)} 
+                  src={viewingContent || ''} 
                   alt={viewingFile.fileName} 
                   className="max-w-full max-h-[70vh] mx-auto"
                 />
               ) : viewingFile.fileType === 'application/pdf' ? (
                 <iframe 
-                  src={fileService.getFileViewUrl(viewingFile.id)} 
+                  src={viewingContent || ''}
                   className="w-full h-[70vh]"
                   title={viewingFile.fileName}
                 />
               ) : viewingFile.fileType.startsWith('video/') ? (
                 <video 
-                  src={fileService.getFileViewUrl(viewingFile.id)} 
+                  src={viewingContent || ''} 
                   controls 
                   className="max-w-full max-h-[70vh] mx-auto"
                 />
               ) : viewingFile.fileType.startsWith('audio/') ? (
                 <audio 
-                  src={fileService.getFileViewUrl(viewingFile.id)} 
+                  src={viewingContent || ''} 
                   controls 
                   className="w-full"
                 />
