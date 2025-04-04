@@ -60,8 +60,8 @@ const featureCard = {
     y: 0,
     boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
     transition: {
-      duration: 0.1,
-      ease: "easeOut"
+      duration: 0.01,
+      type: "tween"
     }
   },
   hover: { 
@@ -70,7 +70,7 @@ const featureCard = {
     boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
     transition: {
       duration: 0.1,
-      ease: "easeOut"
+      type: "tween"
     }
   }
 };
@@ -459,7 +459,7 @@ const HomePage: React.FC = () => {
               >
                 {/* Feature 1 */}
                 <motion.div 
-                  className="bg-white dark:bg-gray-900 rounded-xl shadow-lg overflow-hidden transition-all duration-500"
+                  className="bg-white dark:bg-gray-900 rounded-xl shadow-lg overflow-hidden"
                   variants={featureCard}
                   initial="hidden"
                   animate="visible"
@@ -478,7 +478,7 @@ const HomePage: React.FC = () => {
                 
                 {/* Feature 2 */}
                 <motion.div 
-                  className="bg-white dark:bg-gray-900 rounded-xl shadow-lg overflow-hidden transition-all duration-500"
+                  className="bg-white dark:bg-gray-900 rounded-xl shadow-lg overflow-hidden"
                   variants={featureCard}
                   initial="hidden"
                   animate="visible"
@@ -497,7 +497,7 @@ const HomePage: React.FC = () => {
                 
                 {/* Feature 3 */}
                 <motion.div 
-                  className="bg-white dark:bg-gray-900 rounded-xl shadow-lg overflow-hidden transition-all duration-500"
+                  className="bg-white dark:bg-gray-900 rounded-xl shadow-lg overflow-hidden"
                   variants={featureCard}
                   initial="hidden"
                   animate="visible"
@@ -516,7 +516,7 @@ const HomePage: React.FC = () => {
                 
                 {/* Feature 4 */}
                 <motion.div 
-                  className="bg-white dark:bg-gray-900 rounded-xl shadow-lg overflow-hidden transition-all duration-500"
+                  className="bg-white dark:bg-gray-900 rounded-xl shadow-lg overflow-hidden"
                   variants={featureCard}
                   initial="hidden"
                   animate="visible"
@@ -535,7 +535,7 @@ const HomePage: React.FC = () => {
                 
                 {/* Feature 5 */}
                 <motion.div 
-                  className="bg-white dark:bg-gray-900 rounded-xl shadow-lg overflow-hidden transition-all duration-500"
+                  className="bg-white dark:bg-gray-900 rounded-xl shadow-lg overflow-hidden"
                   variants={featureCard}
                   initial="hidden"
                   animate="visible"
@@ -554,7 +554,7 @@ const HomePage: React.FC = () => {
                 
                 {/* Feature 6 */}
                 <motion.div 
-                  className="bg-white dark:bg-gray-900 rounded-xl shadow-lg overflow-hidden transition-all duration-500"
+                  className="bg-white dark:bg-gray-900 rounded-xl shadow-lg overflow-hidden"
                   variants={featureCard}
                   initial="hidden"
                   animate="visible"
@@ -764,9 +764,7 @@ const HomePage: React.FC = () => {
                 {/* Pro Tier (Coming Soon) */}
                 <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg overflow-hidden opacity-75 transform transition-all">
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="bg-gray-900 dark:bg-gray-800 text-white px-4 py-2 rounded-full text-sm font-bold transform rotate-12">
-                      Coming Soon
-                    </div>
+                    
                   </div>
                   <div className="relative backdrop-blur-sm px-6 py-8 sm:p-10 sm:pb-6">
                     <div>
