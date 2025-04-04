@@ -58,16 +58,18 @@ const featureCard = {
   rest: { 
     scale: 1,
     y: 0,
+    boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
     transition: {
-      duration: 0.5,
+      duration: 0.1,
       ease: "easeOut"
     }
   },
   hover: { 
     scale: 1.03,
     y: -5,
+    boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
     transition: {
-      duration: 0.4,
+      duration: 0.1,
       ease: "easeOut"
     }
   }
@@ -115,6 +117,24 @@ const HomePage: React.FC = () => {
       name: "Emily Rodriguez",
       title: "Project Lead at CreativeStudio",
       avatar: "https://randomuser.me/api/portraits/women/28.jpg"
+    },
+    {
+      quote: "As a healthcare professional, data security is non-negotiable. This platform provides the perfect balance of security and ease of use for sharing confidential information.",
+      name: "Dr. Michael Stewart",
+      title: "Chief Medical Officer",
+      avatar: "https://randomuser.me/api/portraits/men/46.jpg"
+    },
+    {
+      quote: "Our education team has streamlined the entire document sharing process with students. The permission controls are exactly what we needed for academic integrity.",
+      name: "Jessica Martinez",
+      title: "Education Director",
+      avatar: "https://randomuser.me/api/portraits/women/63.jpg"
+    },
+    {
+      quote: "Our legal team needed a solution with ironclad security and detailed access logs. This platform delivers on all fronts while still being remarkably easy to use.",
+      name: "Robert Wilson",
+      title: "Corporate Counsel",
+      avatar: "https://randomuser.me/api/portraits/men/22.jpg"
     }
   ];
 
@@ -582,34 +602,30 @@ const HomePage: React.FC = () => {
                 whileInView={{ opacity: 1 }}
                 viewport={{ once: true }}
                 transition={{ duration: 1.2 }}
-                className="overflow-hidden"
+                className="overflow-hidden relative"
               >
                 <div ref={sliderRef} className="keen-slider">
                   {testimonials.map((testimonial, index) => (
-                    <div key={index} className="keen-slider__slide">
-                      <div className="bg-white dark:bg-gray-900 rounded-xl p-8 max-w-3xl mx-auto">
-                        {/* Decorative quotation marks */}
-                        <svg className="absolute top-0 left-0 transform -translate-x-6 -translate-y-6 h-16 w-16 text-blue-100 dark:text-blue-900" fill="currentColor" viewBox="0 0 32 32" aria-hidden="true">
-                          <path d="M9.352 4C4.456 7.456 1 13.12 1 19.36c0 5.088 3.072 8.064 6.624 8.064 3.36 0 5.856-2.688 5.856-5.856 0-3.168-2.208-5.472-5.088-5.472-.576 0-1.344.096-1.536.192.48-3.264 3.552-7.104 6.624-9.024L9.352 4zm16.512 0c-4.8 3.456-8.256 9.12-8.256 15.36 0 5.088 3.072 8.064 6.624 8.064 3.264 0 5.856-2.688 5.856-5.856 0-3.168-2.304-5.472-5.184-5.472-.576 0-1.248.096-1.44.192.48-3.264 3.456-7.104 6.528-9.024L25.864 4z" />
-                        </svg>
+                    <div key={index} className="keen-slider__slide py-4">
+                      <div className="bg-white dark:bg-gray-900 rounded-xl p-8 max-w-3xl mx-auto shadow-lg border border-gray-100 dark:border-gray-800">
                         
                         <div className="relative">
-                          <blockquote className="mt-10">
-                            <div className="max-w-2xl mx-auto text-xl md:text-2xl font-medium text-gray-700 dark:text-gray-300">
-                              <p>{testimonial.quote}</p>
+                          <blockquote>
+                            <div className="max-w-2xl mx-auto text-xl md:text-2xl font-medium text-gray-700 dark:text-gray-300 italic">
+                              <p>"{testimonial.quote}"</p>
                             </div>
                             <footer className="mt-8">
                               <div className="flex items-center justify-center">
                                 <div className="flex-shrink-0">
                                   <img
-                                    className="h-12 w-12 rounded-full object-cover"
+                                    className="h-14 w-14 rounded-full object-cover ring-2 ring-blue-500 dark:ring-blue-400"
                                     src={testimonial.avatar}
                                     alt={`${testimonial.name} testimonial avatar`}
                                   />
                                 </div>
                                 <div className="ml-4 text-left">
-                                  <div className="text-base font-medium text-gray-900 dark:text-white">{testimonial.name}</div>
-                                  <div className="text-sm text-gray-500 dark:text-gray-400">{testimonial.title}</div>
+                                  <div className="text-base font-semibold text-gray-900 dark:text-white">{testimonial.name}</div>
+                                  <div className="text-sm text-blue-600 dark:text-blue-400">{testimonial.title}</div>
                                 </div>
                               </div>
                             </footer>
@@ -619,9 +635,35 @@ const HomePage: React.FC = () => {
                     </div>
                   ))}
                 </div>
+                
+                {/* Arrow controls */}
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    instanceRef.current?.prev();
+                  }}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 dark:bg-gray-800/80 p-2 rounded-full shadow-lg hover:bg-white dark:hover:bg-gray-800 transition-colors"
+                  aria-label="Previous testimonial"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-600 dark:text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    instanceRef.current?.next();
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 dark:bg-gray-800/80 p-2 rounded-full shadow-lg hover:bg-white dark:hover:bg-gray-800 transition-colors"
+                  aria-label="Next testimonial"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-600 dark:text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
               </motion.div>
               
-              {/* Carousel controls */}
+              {/* Carousel indicators */}
               <div className="flex justify-center mt-8 space-x-2">
                 {testimonials.map((_, idx) => (
                   <button
