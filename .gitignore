@@ -9,6 +9,7 @@
 /backend/uploads/
 /backend/logs/
 /backend/.env
+/backend/src/main/resources/.env
 
 # Frontend
 /frontend/node_modules/
