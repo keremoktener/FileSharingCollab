@@ -16,4 +16,6 @@ public class FileDto {
     private String fileType;
     private Long fileSize;
     private LocalDateTime uploadDate;
+    private boolean deleted;
+    private LocalDateTime deletedAt;
 } 

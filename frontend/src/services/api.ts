@@ -63,7 +63,14 @@ export const fileService = {
   },
 
   downloadFile: async (fileId: number): Promise<Blob> => {
-    const response = await api.get(`/files/${fileId}`, {
+    const response = await api.get(`/files/download/${fileId}`, {
+      responseType: 'blob'
+    });
+    return response.data;
+  },
+  
+  viewFile: async (fileId: number): Promise<Blob> => {
+    const response = await api.get(`/files/view/${fileId}`, {
       responseType: 'blob'
     });
     return response.data;
@@ -72,6 +79,10 @@ export const fileService = {
   deleteFile: async (fileId: number): Promise<any> => {
     const response = await api.delete(`/files/${fileId}`);
     return response.data;
+  },
+  
+  getFileViewUrl: (fileId: number): string => {
+    return `${API_URL}/files/view/${fileId}`;
   }
 };
 

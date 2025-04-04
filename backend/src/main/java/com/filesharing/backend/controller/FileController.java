@@ -47,7 +47,7 @@ public class FileController {
         return ResponseEntity.ok().body(files);
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("/download/{id}")
     public ResponseEntity<Resource> downloadFile(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetailsImpl userDetails) throws IOException {
@@ -61,12 +61,55 @@ public class FileController {
                 .body(resource);
     }
 
+    @GetMapping("/view/{id}")
+    public ResponseEntity<Resource> viewFile(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetailsImpl userDetails) throws IOException {
+        
+        Resource resource = fileService.viewFileAsResource(id, userDetails.getId());
+        String contentType = determineContentType(resource.getFilename());
+        
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(contentType))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + resource.getFilename() + "\"")
+                .body(resource);
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteFile(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
         
-        fileService.deleteFile(id, userDetails.getId());
+        fileService.softDeleteFile(id, userDetails.getId());
         return ResponseEntity.ok().body("File deleted successfully");
+    }
+    
+    // Helper method to determine content type
+    private String determineContentType(String filename) {
+        if (filename == null) {
+            return "application/octet-stream";
+        }
+        
+        String lowercaseName = filename.toLowerCase();
+        
+        if (lowercaseName.endsWith(".pdf")) {
+            return "application/pdf";
+        } else if (lowercaseName.endsWith(".png")) {
+            return "image/png";
+        } else if (lowercaseName.endsWith(".jpg") || lowercaseName.endsWith(".jpeg")) {
+            return "image/jpeg";
+        } else if (lowercaseName.endsWith(".gif")) {
+            return "image/gif";
+        } else if (lowercaseName.endsWith(".txt")) {
+            return "text/plain";
+        } else if (lowercaseName.endsWith(".html") || lowercaseName.endsWith(".htm")) {
+            return "text/html";
+        } else if (lowercaseName.endsWith(".mp4")) {
+            return "video/mp4";
+        } else if (lowercaseName.endsWith(".mp3")) {
+            return "audio/mpeg";
+        } else {
+            return "application/octet-stream";
+        }
     }
 } 

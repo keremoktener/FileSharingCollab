@@ -67,6 +67,7 @@ public class FileServiceImpl implements FileService {
                 .fileSize(file.getSize())
                 .filePath(filePath.toString())
                 .uploadDate(LocalDateTime.now())
+                .deleted(false)
                 .owner(owner)
                 .build();
         
@@ -77,7 +78,7 @@ public class FileServiceImpl implements FileService {
     @Transactional(readOnly = true)
     public List<FileDto> getAllFilesByUser(Long userId) {
         User owner = userService.getUserById(userId);
-        List<FileEntity> files = fileRepository.findByOwner(owner);
+        List<FileEntity> files = fileRepository.findByOwnerAndDeletedFalse(owner);
         
         return files.stream()
                 .map(file -> FileDto.builder()
@@ -86,6 +87,8 @@ public class FileServiceImpl implements FileService {
                         .fileType(file.getFileType())
                         .fileSize(file.getFileSize())
                         .uploadDate(file.getUploadDate())
+                        .deleted(file.isDeleted())
+                        .deletedAt(file.getDeletedAt())
                         .build())
                 .collect(Collectors.toList());
     }
@@ -93,12 +96,9 @@ public class FileServiceImpl implements FileService {
     @Override
     @Transactional(readOnly = true)
     public Resource loadFileAsResource(Long fileId, Long userId) throws IOException {
-        FileEntity file = fileRepository.findById(fileId)
+        User owner = userService.getUserById(userId);
+        FileEntity file = fileRepository.findByIdAndOwnerAndDeletedFalse(fileId, owner)
                 .orElseThrow(() -> new ResourceNotFoundException("File not found with id: " + fileId));
-        
-        if (!file.getOwner().getId().equals(userId)) {
-            throw new AccessDeniedException("You don't have permission to access this file");
-        }
         
         try {
             Path filePath = Paths.get(file.getFilePath());
@@ -116,23 +116,34 @@ public class FileServiceImpl implements FileService {
 
     @Override
     @Transactional
-    public void deleteFile(Long fileId, Long userId) {
-        FileEntity file = fileRepository.findById(fileId)
+    public void softDeleteFile(Long fileId, Long userId) {
+        User owner = userService.getUserById(userId);
+        FileEntity file = fileRepository.findByIdAndOwnerAndDeletedFalse(fileId, owner)
                 .orElseThrow(() -> new ResourceNotFoundException("File not found with id: " + fileId));
         
-        if (!file.getOwner().getId().equals(userId)) {
-            throw new AccessDeniedException("You don't have permission to delete this file");
-        }
+        // Mark file as deleted in database using soft delete
+        fileRepository.softDeleteByIdAndOwner(fileId, owner, LocalDateTime.now());
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public Resource viewFileAsResource(Long fileId, Long userId) throws IOException {
+        // Similar to loadFileAsResource but could be optimized for viewing in browser
+        User owner = userService.getUserById(userId);
+        FileEntity file = fileRepository.findByIdAndOwnerAndDeletedFalse(fileId, owner)
+                .orElseThrow(() -> new ResourceNotFoundException("File not found with id: " + fileId));
         
         try {
-            // Delete the file from the filesystem
             Path filePath = Paths.get(file.getFilePath());
-            Files.deleteIfExists(filePath);
+            Resource resource = new UrlResource(filePath.toUri());
             
-            // Delete the file metadata from the database
-            fileRepository.delete(file);
-        } catch (IOException e) {
-            throw new RuntimeException("Could not delete file", e);
+            if (resource.exists()) {
+                return resource;
+            } else {
+                throw new ResourceNotFoundException("File not found: " + file.getFileName());
+            }
+        } catch (MalformedURLException ex) {
+            throw new ResourceNotFoundException("File not found: " + file.getFileName());
         }
     }
 } 

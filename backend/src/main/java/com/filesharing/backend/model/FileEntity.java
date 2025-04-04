@@ -33,6 +33,12 @@ public class FileEntity {
 
     @Column(nullable = false)
     private LocalDateTime uploadDate;
+    
+    @Column(nullable = false)
+    private boolean deleted = false;
+    
+    @Column
+    private LocalDateTime deletedAt;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)

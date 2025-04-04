@@ -12,5 +12,6 @@ public interface FileService {
     FileEntity saveFile(MultipartFile file, Long userId) throws IOException;
     List<FileDto> getAllFilesByUser(Long userId);
     Resource loadFileAsResource(Long fileId, Long userId) throws IOException;
-    void deleteFile(Long fileId, Long userId);
+    void softDeleteFile(Long fileId, Long userId);
+    Resource viewFileAsResource(Long fileId, Long userId) throws IOException;
 } 

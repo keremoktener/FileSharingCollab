@@ -31,4 +31,6 @@ export interface FileInfo {
   fileType: string;
   fileSize: number;
   uploadDate: string;
+  deleted?: boolean;
+  deletedAt?: string;
 } 
