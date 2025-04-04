@@ -36,6 +36,10 @@ public class JwtTokenProvider {
                 .setSubject(userPrincipal.getUsername())
                 .setIssuedAt(new Date())
                 .setExpiration(new Date((new Date()).getTime() + jwtExpirationMs))
+                .setId(java.util.UUID.randomUUID().toString())
+                .claim("roles", userPrincipal.getAuthorities().stream()
+                        .map(authority -> authority.getAuthority())
+                        .toList())
                 .signWith(getSigningKey(), SignatureAlgorithm.HS512)
                 .compact();
     }
@@ -51,10 +55,17 @@ public class JwtTokenProvider {
 
     public boolean validateJwtToken(String authToken) {
         try {
-            Jwts.parserBuilder()
+            Claims claims = Jwts.parserBuilder()
                     .setSigningKey(getSigningKey())
                     .build()
-                    .parseClaimsJws(authToken);
+                    .parseClaimsJws(authToken)
+                    .getBody();
+            
+            if (claims.getExpiration().before(new Date())) {
+                logger.warning("JWT token is expired");
+                return false;
+            }
+            
             return true;
         } catch (MalformedJwtException e) {
             logger.warning("Invalid JWT token: " + e.getMessage());
