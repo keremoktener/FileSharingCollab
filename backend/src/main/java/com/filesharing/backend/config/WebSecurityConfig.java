@@ -58,7 +58,7 @@ public class WebSecurityConfig {
             .cors(corsConfig -> corsConfig.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf
                 .ignoringRequestMatchers("/api/auth/**")
-                .ignoringRequestMatchers("/api/files/upload")
+                .ignoringRequestMatchers("/api/files/**")
             )
             .sessionManagement(session -> session
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS)

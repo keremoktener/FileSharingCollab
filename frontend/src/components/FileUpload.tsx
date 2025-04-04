@@ -119,8 +119,8 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUploaded }) => {
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-lg p-6 mb-8 transform transition-all">
-      <h2 className="text-xl font-bold mb-4 text-gray-800">Upload New File</h2>
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8 transform transition-all">
+      <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-white">Upload New File</h2>
       
       <div 
         onDragEnter={handleDrag}
@@ -128,7 +128,9 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUploaded }) => {
         onDragOver={handleDrag}
         onDrop={handleDrop}
         className={`relative border-2 border-dashed rounded-xl p-8 transition-all ${
-          dragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:bg-gray-50'
+          dragActive 
+            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' 
+            : 'border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700/30'
         } text-center cursor-pointer`}
         onClick={handleButtonClick}
       >
@@ -142,23 +144,23 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUploaded }) => {
         
         {!file ? (
           <div className="space-y-3">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto text-gray-400 dark:text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
               <polyline points="17 8 12 3 7 8"></polyline>
               <line x1="12" y1="3" x2="12" y2="15"></line>
             </svg>
             <div>
-              <p className="text-gray-700 font-medium">Drag and drop your file here</p>
-              <p className="text-gray-500 text-sm mt-1">or click to browse</p>
+              <p className="text-gray-700 dark:text-gray-300 font-medium">Drag and drop your file here</p>
+              <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">or click to browse</p>
             </div>
-            <p className="text-xs text-gray-400 mt-2">Maximum file size: 10MB</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">Maximum file size: 10MB</p>
           </div>
         ) : (
           <div className="flex items-center justify-center space-x-4">
             {getFileIcon()}
             <div className="text-left">
-              <p className="font-medium text-gray-800 truncate max-w-xs">{file.name}</p>
-              <p className="text-sm text-gray-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+              <p className="font-medium text-gray-800 dark:text-gray-200 truncate max-w-xs">{file.name}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
             </div>
           </div>
         )}
@@ -172,7 +174,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUploaded }) => {
                 setFile(null);
                 if (fileInputRef.current) fileInputRef.current.value = '';
               }}
-              className="px-4 py-2 mr-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              className="px-4 py-2 mr-2 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
               disabled={uploading}
             >
               Cancel
@@ -182,8 +184,8 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUploaded }) => {
               disabled={!file || uploading}
               className={`px-6 py-2 rounded-lg text-white font-medium shadow-md transition-all ${
                 !file || uploading
-                  ? 'bg-blue-400 cursor-not-allowed'
-                  : 'bg-blue-600 hover:bg-blue-700 hover:shadow-lg'
+                  ? 'bg-blue-400 dark:bg-blue-500 cursor-not-allowed'
+                  : 'bg-blue-600 dark:bg-blue-700 hover:bg-blue-700 dark:hover:bg-blue-800 hover:shadow-lg'
               }`}
             >
               {uploading ? (

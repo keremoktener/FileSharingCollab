@@ -9,6 +9,7 @@ import com.filesharing.backend.service.FileService;
 import com.filesharing.backend.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.security.access.AccessDeniedException;
@@ -17,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.nio.file.Files;
@@ -27,6 +29,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 @Service
 public class FileServiceImpl implements FileService {
@@ -145,5 +149,89 @@ public class FileServiceImpl implements FileService {
         } catch (MalformedURLException ex) {
             throw new ResourceNotFoundException("File not found: " + file.getFileName());
         }
+    }
+    
+    @Override
+    @Transactional
+    public FileDto renameFile(Long fileId, String newFileName, Long userId) {
+        if (newFileName == null || newFileName.trim().isEmpty()) {
+            throw new IllegalArgumentException("New file name cannot be empty");
+        }
+        
+        User owner = userService.getUserById(userId);
+        FileEntity file = fileRepository.findByIdAndOwnerAndDeletedFalse(fileId, owner)
+                .orElseThrow(() -> new ResourceNotFoundException("File not found with id: " + fileId));
+        
+        // Clean the new file name
+        String cleanedFileName = StringUtils.cleanPath(newFileName.trim());
+        
+        // Preserve file extension if it's missing in the new name
+        String originalExtension = getFileExtension(file.getFileName());
+        String newExtension = getFileExtension(cleanedFileName);
+        
+        if (originalExtension != null && !originalExtension.isEmpty() && 
+            (newExtension == null || newExtension.isEmpty())) {
+            cleanedFileName = cleanedFileName + "." + originalExtension;
+        }
+        
+        // Update file name
+        file.setFileName(cleanedFileName);
+        file = fileRepository.save(file);
+        
+        // Return updated FileDto
+        return FileDto.builder()
+                .id(file.getId())
+                .fileName(file.getFileName())
+                .fileType(file.getFileType())
+                .fileSize(file.getFileSize())
+                .uploadDate(file.getUploadDate())
+                .deleted(file.isDeleted())
+                .deletedAt(file.getDeletedAt())
+                .build();
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public Resource createBatchDownloadZip(List<Long> fileIds, Long userId) throws IOException {
+        User owner = userService.getUserById(userId);
+        
+        // Get all files that belong to the user
+        List<FileEntity> files = fileRepository.findAllById(fileIds).stream()
+                .filter(file -> file.getOwner().getId().equals(userId) && !file.isDeleted())
+                .collect(Collectors.toList());
+        
+        // If no files found or don't belong to user, throw exception
+        if (files.isEmpty()) {
+            throw new ResourceNotFoundException("No files found or you don't have permission to access them");
+        }
+        
+        // Create a ZIP archive in memory
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try (ZipOutputStream zos = new ZipOutputStream(baos)) {
+            for (FileEntity file : files) {
+                // Get the file content
+                Path filePath = Paths.get(file.getFilePath());
+                byte[] fileData = Files.readAllBytes(filePath);
+                
+                // Add file to ZIP
+                ZipEntry entry = new ZipEntry(file.getFileName());
+                entry.setSize(fileData.length);
+                zos.putNextEntry(entry);
+                zos.write(fileData);
+                zos.closeEntry();
+            }
+        }
+        
+        // Return ZIP as a ByteArrayResource
+        ByteArrayResource resource = new ByteArrayResource(baos.toByteArray());
+        return resource;
+    }
+    
+    // Helper method to extract file extension
+    private String getFileExtension(String fileName) {
+        if (fileName == null || fileName.isEmpty() || !fileName.contains(".")) {
+            return "";
+        }
+        return fileName.substring(fileName.lastIndexOf(".") + 1);
     }
 } 

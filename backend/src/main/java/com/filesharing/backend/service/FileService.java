@@ -14,4 +14,6 @@ public interface FileService {
     Resource loadFileAsResource(Long fileId, Long userId) throws IOException;
     void softDeleteFile(Long fileId, Long userId);
     Resource viewFileAsResource(Long fileId, Long userId) throws IOException;
+    FileDto renameFile(Long fileId, String newFileName, Long userId);
+    Resource createBatchDownloadZip(List<Long> fileIds, Long userId) throws IOException;
 } 

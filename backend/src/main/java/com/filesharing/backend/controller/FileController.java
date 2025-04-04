@@ -1,6 +1,8 @@
 package com.filesharing.backend.controller;
 
 import com.filesharing.backend.dto.FileDto;
+import com.filesharing.backend.dto.BatchDownloadRequest;
+import com.filesharing.backend.dto.RenameFileRequest;
 import com.filesharing.backend.model.FileEntity;
 import com.filesharing.backend.security.UserDetailsImpl;
 import com.filesharing.backend.service.FileService;
@@ -82,6 +84,29 @@ public class FileController {
         
         fileService.softDeleteFile(id, userDetails.getId());
         return ResponseEntity.ok().body("File deleted successfully");
+    }
+    
+    @PutMapping("/{id}/rename")
+    public ResponseEntity<FileDto> renameFile(
+            @PathVariable Long id,
+            @RequestBody RenameFileRequest request,
+            @AuthenticationPrincipal UserDetailsImpl userDetails) {
+        
+        FileDto updatedFile = fileService.renameFile(id, request.getNewName(), userDetails.getId());
+        return ResponseEntity.ok().body(updatedFile);
+    }
+
+    @PostMapping("/batch-download")
+    public ResponseEntity<Resource> batchDownload(
+            @RequestBody BatchDownloadRequest request,
+            @AuthenticationPrincipal UserDetailsImpl userDetails) throws IOException {
+        
+        Resource zipResource = fileService.createBatchDownloadZip(request.getFileIds(), userDetails.getId());
+        
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"files.zip\"")
+                .body(zipResource);
     }
     
     // Helper method to determine content type

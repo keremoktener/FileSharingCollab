@@ -63,7 +63,7 @@ export const fileService = {
   },
 
   downloadFile: async (fileId: number): Promise<Blob> => {
-    const response = await api.get(`/files/download/${fileId}`, {
+    const response = await api.get<Blob>(`/files/download/${fileId}`, {
       responseType: 'blob'
     });
     return response.data;
@@ -81,8 +81,21 @@ export const fileService = {
     return response.data;
   },
   
+  renameFile: async (fileId: number, newName: string): Promise<FileInfo> => {
+    const response = await api.put<FileInfo>(`/files/${fileId}/rename`, { newName });
+    console.log('Rename response:', response);
+    return response.data;
+  },
+  
   getFileViewUrl: (fileId: number): string => {
     return `${API_URL}/files/view/${fileId}`;
+  },
+
+  batchDownloadFiles: async (fileIds: number[]): Promise<Blob> => {
+    const response = await api.post<Blob>('/files/batch-download', { fileIds }, {
+      responseType: 'blob'
+    });
+    return response.data;
   }
 };
 

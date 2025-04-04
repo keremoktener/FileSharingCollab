@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import ThemeToggle from './ThemeToggle';
 
 const Navbar: React.FC = () => {
   const { isAuthenticated, user, logout } = useAuth();
@@ -23,7 +24,10 @@ const Navbar: React.FC = () => {
         </Link>
         
         {/* Mobile menu button */}
-        <div className="md:hidden">
+        <div className="md:hidden flex items-center gap-3">
+          <div className="flex items-center">
+            <ThemeToggle />
+          </div>
           <button 
             onClick={() => setMenuOpen(!menuOpen)}
             className="flex items-center p-2 rounded-md hover:bg-blue-800 transition-colors"
@@ -38,6 +42,7 @@ const Navbar: React.FC = () => {
         <div className="hidden md:flex items-center space-x-6">
           {isAuthenticated ? (
             <div className="flex items-center gap-6">
+              <ThemeToggle />
               <div className="text-sm font-medium">
                 <span className="opacity-80">Hello,</span> {user?.username}
               </div>
@@ -54,7 +59,8 @@ const Navbar: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="flex gap-4">
+            <div className="flex gap-4 items-center">
+              <ThemeToggle />
               <Link
                 to="/login"
                 className="bg-white text-blue-600 px-4 py-1.5 rounded-lg font-medium hover:bg-opacity-90 transition-all shadow-md hover:shadow-lg"
@@ -84,6 +90,10 @@ const Navbar: React.FC = () => {
                   </div>
                   <div className="text-sm">{user?.username}</div>
                 </div>
+                <div className="flex items-center py-2">
+                  <span className="text-sm mr-3">Toggle theme:</span>
+                  <ThemeToggle />
+                </div>
                 <button
                   onClick={logout}
                   className="bg-white text-blue-600 px-4 py-1.5 rounded-lg font-medium hover:bg-opacity-90 transition-all w-full text-center"
@@ -93,6 +103,10 @@ const Navbar: React.FC = () => {
               </>
             ) : (
               <>
+                <div className="flex items-center py-2">
+                  <span className="text-sm mr-3">Toggle theme:</span>
+                  <ThemeToggle />
+                </div>
                 <Link
                   to="/login"
                   className="bg-white text-blue-600 px-4 py-1.5 rounded-lg font-medium hover:bg-opacity-90 transition-all w-full text-center"
