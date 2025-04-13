@@ -4,9 +4,10 @@ import toast from 'react-hot-toast';
 
 interface FileUploadProps {
   onFileUploaded: () => void;
+  currentFolderId?: number;
 }
 
-const FileUpload: React.FC<FileUploadProps> = ({ onFileUploaded }) => {
+const FileUpload: React.FC<FileUploadProps> = ({ onFileUploaded, currentFolderId }) => {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
@@ -55,7 +56,14 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUploaded }) => {
 
     try {
       setUploading(true);
-      await fileService.uploadFile(file);
+      
+      // Upload file to specific folder if folderId is provided
+      if (currentFolderId) {
+        await fileService.uploadFileToFolder(file, currentFolderId);
+      } else {
+        await fileService.uploadFile(file);
+      }
+      
       toast.success('File uploaded successfully');
       setFile(null);
       if (fileInputRef.current) {
@@ -120,7 +128,10 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUploaded }) => {
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8 transform transition-all">
-      <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-white">Upload New File</h2>
+      <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-white">
+        Upload New File
+        {currentFolderId && <span className="text-sm font-normal text-gray-500 ml-2">(to current folder)</span>}
+      </h2>
       
       <div 
         onDragEnter={handleDrag}

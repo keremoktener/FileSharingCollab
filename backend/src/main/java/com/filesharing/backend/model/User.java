@@ -31,4 +31,13 @@ public class User {
 
     @OneToMany(mappedBy = "owner", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<FileEntity> files = new ArrayList<>();
+    
+    @OneToMany(mappedBy = "owner", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Folder> folders = new ArrayList<>();
+    
+    @OneToMany(mappedBy = "owner", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<SharedItem> sharedItems = new ArrayList<>();
+    
+    @OneToMany(mappedBy = "sharedWith", cascade = CascadeType.ALL)
+    private List<SharedItem> sharedWithMe = new ArrayList<>();
 } 

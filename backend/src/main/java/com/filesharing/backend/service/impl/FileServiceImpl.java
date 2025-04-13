@@ -3,8 +3,10 @@ package com.filesharing.backend.service.impl;
 import com.filesharing.backend.dto.FileDto;
 import com.filesharing.backend.exception.ResourceNotFoundException;
 import com.filesharing.backend.model.FileEntity;
+import com.filesharing.backend.model.Folder;
 import com.filesharing.backend.model.User;
 import com.filesharing.backend.repository.FileRepository;
+import com.filesharing.backend.repository.FolderRepository;
 import com.filesharing.backend.service.FileService;
 import com.filesharing.backend.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,6 +45,9 @@ public class FileServiceImpl implements FileService {
 
     @Autowired
     private UserService userService;
+    
+    @Autowired
+    private FolderRepository folderRepository;
 
     @Override
     @Transactional
@@ -73,6 +78,46 @@ public class FileServiceImpl implements FileService {
                 .uploadDate(LocalDateTime.now())
                 .deleted(false)
                 .owner(owner)
+                .folder(null) // Not in any folder
+                .build();
+        
+        return fileRepository.save(fileEntity);
+    }
+    
+    @Override
+    @Transactional
+    public FileEntity saveFileToFolder(MultipartFile file, Long folderId, Long userId) throws IOException {
+        User owner = userService.getUserById(userId);
+        
+        // Find the folder and validate it belongs to the user
+        Folder folder = folderRepository.findByIdAndOwnerAndDeletedFalse(folderId, owner)
+                .orElseThrow(() -> new ResourceNotFoundException("Folder not found with id: " + folderId));
+        
+        String originalFilename = StringUtils.cleanPath(file.getOriginalFilename());
+        
+        // Generate a unique filename
+        String uniqueFilename = UUID.randomUUID().toString() + "_" + originalFilename;
+        
+        // Create upload directory if it doesn't exist
+        Path uploadPath = Paths.get(uploadDir);
+        if (!Files.exists(uploadPath)) {
+            Files.createDirectories(uploadPath);
+        }
+        
+        // Save the file to the upload directory
+        Path filePath = uploadPath.resolve(uniqueFilename);
+        Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+        
+        // Save file metadata to database with folder reference
+        FileEntity fileEntity = FileEntity.builder()
+                .fileName(originalFilename)
+                .fileType(file.getContentType())
+                .fileSize(file.getSize())
+                .filePath(filePath.toString())
+                .uploadDate(LocalDateTime.now())
+                .deleted(false)
+                .owner(owner)
+                .folder(folder)
                 .build();
         
         return fileRepository.save(fileEntity);
@@ -85,15 +130,34 @@ public class FileServiceImpl implements FileService {
         List<FileEntity> files = fileRepository.findByOwnerAndDeletedFalse(owner);
         
         return files.stream()
-                .map(file -> FileDto.builder()
-                        .id(file.getId())
-                        .fileName(file.getFileName())
-                        .fileType(file.getFileType())
-                        .fileSize(file.getFileSize())
-                        .uploadDate(file.getUploadDate())
-                        .deleted(file.isDeleted())
-                        .deletedAt(file.getDeletedAt())
-                        .build())
+                .map(this::convertToDto)
+                .collect(Collectors.toList());
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public List<FileDto> getFilesByFolder(Long folderId, Long userId) {
+        User owner = userService.getUserById(userId);
+        
+        // Find the folder and validate it belongs to the user
+        Folder folder = folderRepository.findByIdAndOwnerAndDeletedFalse(folderId, owner)
+                .orElseThrow(() -> new ResourceNotFoundException("Folder not found with id: " + folderId));
+        
+        List<FileEntity> files = fileRepository.findByOwnerAndFolderAndDeletedFalse(owner, folder);
+        
+        return files.stream()
+                .map(this::convertToDto)
+                .collect(Collectors.toList());
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public List<FileDto> getFilesNotInFolder(Long userId) {
+        User owner = userService.getUserById(userId);
+        List<FileEntity> files = fileRepository.findByOwnerAndFolderIsNullAndDeletedFalse(owner);
+        
+        return files.stream()
+                .map(this::convertToDto)
                 .collect(Collectors.toList());
     }
 
@@ -179,15 +243,29 @@ public class FileServiceImpl implements FileService {
         file = fileRepository.save(file);
         
         // Return updated FileDto
-        return FileDto.builder()
-                .id(file.getId())
-                .fileName(file.getFileName())
-                .fileType(file.getFileType())
-                .fileSize(file.getFileSize())
-                .uploadDate(file.getUploadDate())
-                .deleted(file.isDeleted())
-                .deletedAt(file.getDeletedAt())
-                .build();
+        return convertToDto(file);
+    }
+    
+    @Override
+    @Transactional
+    public FileDto moveFileToFolder(Long fileId, Long folderId, Long userId) {
+        User owner = userService.getUserById(userId);
+        
+        FileEntity file = fileRepository.findByIdAndOwnerAndDeletedFalse(fileId, owner)
+                .orElseThrow(() -> new ResourceNotFoundException("File not found with id: " + fileId));
+        
+        if (folderId == null) {
+            // Move to root (no folder)
+            file.setFolder(null);
+        } else {
+            // Move to specified folder
+            Folder folder = folderRepository.findByIdAndOwnerAndDeletedFalse(folderId, owner)
+                    .orElseThrow(() -> new ResourceNotFoundException("Folder not found with id: " + folderId));
+            file.setFolder(folder);
+        }
+        
+        file = fileRepository.save(file);
+        return convertToDto(file);
     }
     
     @Override
@@ -200,38 +278,77 @@ public class FileServiceImpl implements FileService {
                 .filter(file -> file.getOwner().getId().equals(userId) && !file.isDeleted())
                 .collect(Collectors.toList());
         
-        // If no files found or don't belong to user, throw exception
         if (files.isEmpty()) {
             throw new ResourceNotFoundException("No files found or you don't have permission to access them");
         }
         
-        // Create a ZIP archive in memory
+        // Create a zip with all files
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         try (ZipOutputStream zos = new ZipOutputStream(baos)) {
             for (FileEntity file : files) {
-                // Get the file content
                 Path filePath = Paths.get(file.getFilePath());
-                byte[] fileData = Files.readAllBytes(filePath);
-                
-                // Add file to ZIP
-                ZipEntry entry = new ZipEntry(file.getFileName());
-                entry.setSize(fileData.length);
-                zos.putNextEntry(entry);
-                zos.write(fileData);
-                zos.closeEntry();
+                if (Files.exists(filePath)) {
+                    ZipEntry entry = new ZipEntry(file.getFileName());
+                    zos.putNextEntry(entry);
+                    Files.copy(filePath, zos);
+                    zos.closeEntry();
+                }
             }
         }
         
-        // Return ZIP as a ByteArrayResource
-        ByteArrayResource resource = new ByteArrayResource(baos.toByteArray());
-        return resource;
+        return new ByteArrayResource(baos.toByteArray());
     }
     
-    // Helper method to extract file extension
+    @Override
+    @Transactional(readOnly = true)
+    public Resource createFolderDownloadZip(Long folderId, Long userId) throws IOException {
+        User owner = userService.getUserById(userId);
+        
+        // Find the folder and validate it belongs to the user
+        Folder folder = folderRepository.findByIdAndOwnerAndDeletedFalse(folderId, owner)
+                .orElseThrow(() -> new ResourceNotFoundException("Folder not found with id: " + folderId));
+        
+        // Get all files in the folder
+        List<FileEntity> files = fileRepository.findByOwnerAndFolderAndDeletedFalse(owner, folder);
+        
+        if (files.isEmpty()) {
+            throw new ResourceNotFoundException("No files found in the folder");
+        }
+        
+        // Create a zip with all files
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try (ZipOutputStream zos = new ZipOutputStream(baos)) {
+            for (FileEntity file : files) {
+                Path filePath = Paths.get(file.getFilePath());
+                if (Files.exists(filePath)) {
+                    ZipEntry entry = new ZipEntry(file.getFileName());
+                    zos.putNextEntry(entry);
+                    Files.copy(filePath, zos);
+                    zos.closeEntry();
+                }
+            }
+        }
+        
+        return new ByteArrayResource(baos.toByteArray());
+    }
+    
     private String getFileExtension(String fileName) {
-        if (fileName == null || fileName.isEmpty() || !fileName.contains(".")) {
+        if (fileName == null || !fileName.contains(".")) {
             return "";
         }
         return fileName.substring(fileName.lastIndexOf(".") + 1);
+    }
+    
+    private FileDto convertToDto(FileEntity file) {
+        return FileDto.builder()
+                .id(file.getId())
+                .fileName(file.getFileName())
+                .fileType(file.getFileType())
+                .fileSize(file.getFileSize())
+                .uploadDate(file.getUploadDate())
+                .deleted(file.isDeleted())
+                .deletedAt(file.getDeletedAt())
+                .folderId(file.getFolder() != null ? file.getFolder().getId() : null)
+                .build();
     }
 } 

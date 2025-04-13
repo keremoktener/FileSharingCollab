@@ -1,25 +1,60 @@
 import React, { useEffect, useState } from 'react';
-import { fileService } from '../services/api';
-import { FileInfo } from '../types';
+import { fileService, folderService, sharingService } from '../services/api';
+import { FileInfo, FolderInfo, SharedItemInfo } from '../types';
 import FileUpload from '../components/FileUpload';
 import FileList from '../components/FileList';
+import FolderList from '../components/FolderList';
+import CreateFolderModal from '../components/CreateFolderModal';
+import ShareModal from '../components/ShareModal';
+import SharedItemList from '../components/SharedItemList';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
+import { FolderPlus, ChevronRight, Home, Share, Folder, File } from 'react-feather';
 
 // Maximum storage limit in bytes (10GB)
 const MAX_STORAGE = 10 * 1024 * 1024 * 1024;
 
+// View mode enum
+enum ViewMode {
+  FILES,
+  SHARED_WITH_ME,
+  SHARED_BY_ME
+}
+
 const Dashboard: React.FC = () => {
   const [files, setFiles] = useState<FileInfo[]>([]);
+  const [folders, setFolders] = useState<FolderInfo[]>([]);
+  const [currentFolder, setCurrentFolder] = useState<FolderInfo | null>(null);
+  const [sharedWithMe, setSharedWithMe] = useState<SharedItemInfo[]>([]);
+  const [sharedByMe, setSharedByMe] = useState<SharedItemInfo[]>([]);
+  const [breadcrumbs, setBreadcrumbs] = useState<FolderInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0); // Used to trigger skeleton refresh
+  const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.FILES);
+  
+  // Modals
+  const [showCreateFolderModal, setShowCreateFolderModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [itemToShare, setItemToShare] = useState<FileInfo | FolderInfo | null>(null);
+  const [isShareFolder, setIsShareFolder] = useState(false);
+  
   const { user } = useAuth();
 
+  // Load files based on current folder
   const loadFiles = async () => {
     try {
       setLoading(true);
       setRefreshKey(prev => prev + 1); // Update to trigger skeleton animation
-      const data = await fileService.getAllFiles();
+      let data;
+      
+      if (currentFolder) {
+        // Load files in the current folder
+        data = await folderService.getFilesInFolder(currentFolder.id);
+      } else {
+        // Load root files (not in any folder)
+        data = await fileService.getRootFiles();
+      }
+      
       setFiles(data);
     } catch (error) {
       console.error('Error fetching files:', error);
@@ -29,9 +64,144 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  useEffect(() => {
+  // Load folders based on current folder
+  const loadFolders = async () => {
+    try {
+      let data;
+      
+      if (currentFolder) {
+        // Load subfolders of current folder
+        data = await folderService.getSubfolders(currentFolder.id);
+      } else {
+        // Load root folders
+        data = await folderService.getRootFolders();
+      }
+      
+      setFolders(data);
+    } catch (error) {
+      console.error('Error fetching folders:', error);
+      toast.error('Failed to load folders');
+    }
+  };
+
+  // Load shared items
+  const loadSharedItems = async () => {
+    try {
+      const [withMeItems, byMeItems] = await Promise.all([
+        sharingService.getSharedWithMe(),
+        sharingService.getSharedByMe()
+      ]);
+      
+      setSharedWithMe(withMeItems);
+      setSharedByMe(byMeItems);
+    } catch (error) {
+      console.error('Error loading shared items:', error);
+      toast.error('Failed to load shared items');
+    }
+  };
+
+  // Reset to root folder and update breadcrumbs
+  const navigateToRoot = () => {
+    setCurrentFolder(null);
+    setBreadcrumbs([]);
+    loadFolders();
     loadFiles();
-  }, []);
+  };
+
+  // Navigate to a specific folder and update breadcrumbs
+  const handleFolderClick = async (folderId: number) => {
+    try {
+      // Find the folder in the current folders list
+      const folder = folders.find(f => f.id === folderId);
+      
+      if (folder) {
+        setCurrentFolder(folder);
+        
+        // Update breadcrumbs
+        if (currentFolder) {
+          // Add current folder to breadcrumbs
+          setBreadcrumbs([...breadcrumbs, currentFolder]);
+        } else {
+          // Starting from root
+          setBreadcrumbs([]);
+        }
+        
+        // Load subfolders and files for the clicked folder
+        const [subfolders, filesInFolder] = await Promise.all([
+          folderService.getSubfolders(folderId),
+          folderService.getFilesInFolder(folderId)
+        ]);
+        
+        setFolders(subfolders);
+        setFiles(filesInFolder);
+      }
+    } catch (error) {
+      console.error('Error navigating to folder:', error);
+      toast.error('Failed to open folder');
+    }
+  };
+
+  // Navigate to a specific folder in the breadcrumb path
+  const handleBreadcrumbClick = async (index: number) => {
+    if (index === -1) {
+      // Clicked on "Home" - go to root
+      navigateToRoot();
+      return;
+    }
+    
+    // Get the selected folder from breadcrumbs
+    const folder = breadcrumbs[index];
+    
+    // Update breadcrumbs to only include folders up to the clicked one
+    setBreadcrumbs(breadcrumbs.slice(0, index));
+    
+    // Set current folder and load its contents
+    setCurrentFolder(folder);
+    
+    try {
+      const [subfolders, filesInFolder] = await Promise.all([
+        folderService.getSubfolders(folder.id),
+        folderService.getFilesInFolder(folder.id)
+      ]);
+      
+      setFolders(subfolders);
+      setFiles(filesInFolder);
+    } catch (error) {
+      console.error('Error navigating to breadcrumb folder:', error);
+      toast.error('Failed to navigate to folder');
+    }
+  };
+
+  // Handle file sharing
+  const handleShareFile = (file: FileInfo) => {
+    setItemToShare(file);
+    setIsShareFolder(false);
+    setShowShareModal(true);
+  };
+
+  // Handle folder sharing
+  const handleShareFolder = (folder: FolderInfo) => {
+    setItemToShare(folder);
+    setIsShareFolder(true);
+    setShowShareModal(true);
+  };
+
+  // Refresh all data
+  const refreshData = () => {
+    loadFiles();
+    loadFolders();
+    loadSharedItems();
+  };
+
+  // Initial data loading
+  useEffect(() => {
+    if (viewMode === ViewMode.FILES) {
+      loadFiles();
+      loadFolders();
+    } else {
+      loadSharedItems();
+    }
+  }, [viewMode]);
 
   // Get some stats
   const totalFiles = files.length;
@@ -66,83 +236,202 @@ const Dashboard: React.FC = () => {
           </div>
           
           {/* Quick stats */}
-          <div className="grid grid-cols-2 gap-4 mt-4 md:mt-0">
-            <div className="bg-white dark:bg-gray-800 shadow rounded-xl p-4 text-center transition-all duration-300 hover:shadow-md hover:scale-105 transform cursor-pointer">
-              <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{totalFiles}</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Files</p>
-            </div>
-            <div className="bg-white dark:bg-gray-800 shadow rounded-xl p-4 text-center transition-all duration-300 hover:shadow-md hover:scale-105 transform cursor-pointer">
-              <p className="text-2xl font-bold text-green-600 dark:text-green-400">{formatTotalSize(totalSize)}</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Used Space</p>
-            </div>
-          </div>
-        </div>
-        
-        {/* Storage usage bar */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-md mt-4 transition-all duration-300 hover:shadow-lg">
-          <div className="flex justify-between mb-2">
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Storage Usage</span>
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              {formatTotalSize(totalSize)} / {formatTotalSize(MAX_STORAGE)}
-            </span>
-          </div>
-          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+          <div className="grid grid-cols-3 gap-4 mt-4 md:mt-0">
             <div 
-              className={`h-2.5 rounded-full transition-all duration-1000 ease-out ${getUsageColor()}`} 
-              style={{ width: `${Math.min(usagePercentage, 100)}%` }}
-            ></div>
-          </div>
-          <div className="flex justify-between mt-1">
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              {usagePercentage.toFixed(1)}% used
-            </span>
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              {formatTotalSize(MAX_STORAGE - totalSize)} free
-            </span>
+              className={`bg-white dark:bg-gray-800 shadow rounded-xl p-3 text-center transition-all duration-300 hover:shadow-md transform cursor-pointer ${viewMode === ViewMode.FILES ? 'border-2 border-blue-500' : ''}`}
+              onClick={() => setViewMode(ViewMode.FILES)}
+            >
+              <File className="h-5 w-5 mx-auto text-blue-600 dark:text-blue-400 mb-1" />
+              <p className="text-sm text-gray-500 dark:text-gray-400">My Files</p>
+            </div>
+            <div 
+              className={`bg-white dark:bg-gray-800 shadow rounded-xl p-3 text-center transition-all duration-300 hover:shadow-md transform cursor-pointer ${viewMode === ViewMode.SHARED_WITH_ME ? 'border-2 border-blue-500' : ''}`}
+              onClick={() => setViewMode(ViewMode.SHARED_WITH_ME)}
+            >
+              <Share className="h-5 w-5 mx-auto text-green-600 dark:text-green-400 mb-1" />
+              <p className="text-sm text-gray-500 dark:text-gray-400">Shared with me</p>
+            </div>
+            <div 
+              className={`bg-white dark:bg-gray-800 shadow rounded-xl p-3 text-center transition-all duration-300 hover:shadow-md transform cursor-pointer ${viewMode === ViewMode.SHARED_BY_ME ? 'border-2 border-blue-500' : ''}`}
+              onClick={() => setViewMode(ViewMode.SHARED_BY_ME)}
+            >
+              <Share className="h-5 w-5 mx-auto text-purple-600 dark:text-purple-400 mb-1" />
+              <p className="text-sm text-gray-500 dark:text-gray-400">Shared by me</p>
+            </div>
           </div>
         </div>
         
-        {/* Welcome message */}
-        <div className="bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-800 text-white rounded-xl p-6 shadow-lg mb-8 mt-6 flex items-center transition-all duration-300 hover:shadow-xl transform hover:scale-[1.01]">
-          <div className="mr-4">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"></path>
-              <path d="M13 2v7h7"></path>
-            </svg>
-          </div>
-          <div>
-            <h2 className="text-xl font-bold">Welcome back, {user?.username || 'User'}!</h2>
-            <p className="opacity-80 mt-1">Your personal cloud storage is ready. Upload files to get started.</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="transition-all duration-300 ease-in-out transform hover:shadow-lg">
-        <FileUpload onFileUploaded={loadFiles} />
-      </div>
-
-      {loading ? (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-          <div className="animate-pulse space-y-4">
-            <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/4 mb-6"></div>
-            <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded"></div>
-            <div className="grid grid-cols-6 gap-4">
-              <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded col-span-1"></div>
-              <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded col-span-1"></div>
-              <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded col-span-1"></div>
-              <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded col-span-2"></div>
-              <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded col-span-1"></div>
+        {/* Storage usage bar (only show in Files view) */}
+        {viewMode === ViewMode.FILES && (
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-md mt-4 transition-all duration-300 hover:shadow-lg">
+            <div className="flex justify-between mb-2">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Storage Usage</span>
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                {formatTotalSize(totalSize)} / {formatTotalSize(MAX_STORAGE)}
+              </span>
             </div>
-            <div className="space-y-2">
-              {[1, 2, 3].map((item) => (
-                <div key={`skeleton-${item}-${refreshKey}`} className="h-16 bg-gray-200 dark:bg-gray-700 rounded"></div>
-              ))}
+            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+              <div 
+                className={`h-2.5 rounded-full transition-all duration-1000 ease-out ${getUsageColor()}`} 
+                style={{ width: `${Math.min(usagePercentage, 100)}%` }}
+              ></div>
+            </div>
+            <div className="flex justify-between mt-1">
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                {usagePercentage.toFixed(1)}% used
+              </span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                {formatTotalSize(MAX_STORAGE - totalSize)} free
+              </span>
             </div>
           </div>
-        </div>
+        )}
+        
+        {/* Welcome message (only show in Files view) */}
+        {viewMode === ViewMode.FILES && (
+          <div className="bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-800 text-white rounded-xl p-6 shadow-lg mb-8 mt-6 flex items-center transition-all duration-300 hover:shadow-xl transform hover:scale-[1.01]">
+            <div className="mr-4">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"></path>
+                <path d="M13 2v7h7"></path>
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-xl font-bold">Welcome back, {user?.username || 'User'}!</h2>
+              <p className="opacity-80 mt-1">Your personal cloud storage is ready. Upload files to get started.</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Main content based on view mode */}
+      {viewMode === ViewMode.FILES ? (
+        <>
+          {/* Breadcrumbs */}
+          <div className="flex items-center text-sm text-gray-600 dark:text-gray-400 mb-4">
+            <button
+              onClick={() => navigateToRoot()}
+              className="flex items-center hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
+            >
+              <Home size={16} className="mr-1" />
+              <span>Home</span>
+            </button>
+            
+            {breadcrumbs.map((folder, index) => (
+              <React.Fragment key={folder.id}>
+                <ChevronRight size={16} className="mx-2" />
+                <button
+                  onClick={() => handleBreadcrumbClick(index)}
+                  className="hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
+                >
+                  {folder.name}
+                </button>
+              </React.Fragment>
+            ))}
+            
+            {currentFolder && (
+              <>
+                <ChevronRight size={16} className="mx-2" />
+                <span className="font-medium text-blue-500 dark:text-blue-400">{currentFolder.name}</span>
+              </>
+            )}
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex flex-wrap gap-4 mb-6">
+            <button
+              onClick={() => setShowCreateFolderModal(true)}
+              className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md shadow transition-colors"
+            >
+              <FolderPlus size={18} className="mr-2" />
+              New Folder
+            </button>
+            
+            <FileUpload 
+              onFileUploaded={loadFiles} 
+              currentFolderId={currentFolder?.id} 
+            />
+          </div>
+
+          {/* Folder list */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-800 dark:text-white flex items-center">
+                <div className="rounded-md p-1.5 bg-yellow-100 dark:bg-yellow-900/30 mr-2">
+                  <Folder size={20} className="text-yellow-500 dark:text-yellow-400" />
+                </div>
+                {currentFolder ? `Folders in ${currentFolder.name}` : 'Folders'}
+              </h2>
+              
+              <button
+                onClick={() => setShowCreateFolderModal(true)}
+                className="text-sm flex items-center text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+              >
+                <FolderPlus size={16} className="mr-1" />
+                New Folder
+              </button>
+            </div>
+            
+            <FolderList 
+              folders={folders}
+              onFolderAction={loadFolders}
+              onFolderClick={handleFolderClick}
+              onShare={handleShareFolder}
+              currentFolder={currentFolder}
+            />
+          </div>
+
+          {/* File list */}
+          {loading ? (
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+              <div className="animate-pulse space-y-4">
+                <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/4 mb-6"></div>
+                <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                <div className="grid grid-cols-6 gap-4">
+                  <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded col-span-1"></div>
+                  <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded col-span-1"></div>
+                  <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded col-span-1"></div>
+                  <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded col-span-2"></div>
+                  <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded col-span-1"></div>
+                </div>
+                <div className="space-y-2">
+                  {[1, 2, 3].map((item) => (
+                    <div key={`skeleton-${item}-${refreshKey}`} className="h-16 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="transition-all duration-300 ease-in-out transform">
+              <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-4 flex items-center">
+                <File size={20} className="mr-2 text-blue-500" />
+                {currentFolder ? `Files in ${currentFolder.name}` : 'Files'}
+              </h2>
+              
+              <FileList 
+                files={files} 
+                onFileAction={loadFiles} 
+                onShare={handleShareFile}
+                currentFolderId={currentFolder?.id}
+                folders={folders}
+                onFileMove={loadFiles}
+              />
+            </div>
+          )}
+        </>
       ) : (
-        <div className="transition-all duration-300 ease-in-out transform">
-          <FileList files={files} onFileAction={loadFiles} />
+        /* Shared Items View */
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+          <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-6 flex items-center">
+            <Share size={20} className="mr-2 text-green-500" />
+            {viewMode === ViewMode.SHARED_WITH_ME ? 'Shared with me' : 'Shared by me'}
+          </h2>
+          
+          <SharedItemList 
+            items={viewMode === ViewMode.SHARED_WITH_ME ? sharedWithMe : sharedByMe} 
+            isSharedByMe={viewMode === ViewMode.SHARED_BY_ME}
+            onItemAction={loadSharedItems}
+          />
         </div>
       )}
       
@@ -188,6 +477,28 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Modals */}
+      <CreateFolderModal 
+        isOpen={showCreateFolderModal}
+        onClose={() => setShowCreateFolderModal(false)}
+        onFolderCreated={() => {
+          loadFolders();
+          toast.success('Folder created successfully');
+        }}
+        currentFolder={currentFolder}
+      />
+      
+      <ShareModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        onShare={() => {
+          loadSharedItems();
+          toast.success('Item shared successfully');
+        }}
+        item={itemToShare}
+        isFolder={isShareFolder}
+      />
     </div>
   );
 };

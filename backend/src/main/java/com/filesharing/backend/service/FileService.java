@@ -10,10 +10,15 @@ import java.util.List;
 
 public interface FileService {
     FileEntity saveFile(MultipartFile file, Long userId) throws IOException;
+    FileEntity saveFileToFolder(MultipartFile file, Long folderId, Long userId) throws IOException;
     List<FileDto> getAllFilesByUser(Long userId);
+    List<FileDto> getFilesByFolder(Long folderId, Long userId);
+    List<FileDto> getFilesNotInFolder(Long userId);
     Resource loadFileAsResource(Long fileId, Long userId) throws IOException;
     void softDeleteFile(Long fileId, Long userId);
     Resource viewFileAsResource(Long fileId, Long userId) throws IOException;
     FileDto renameFile(Long fileId, String newFileName, Long userId);
+    FileDto moveFileToFolder(Long fileId, Long folderId, Long userId);
     Resource createBatchDownloadZip(List<Long> fileIds, Long userId) throws IOException;
+    Resource createFolderDownloadZip(Long folderId, Long userId) throws IOException;
 } 

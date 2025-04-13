@@ -3,6 +3,7 @@ package com.filesharing.backend.controller;
 import com.filesharing.backend.dto.FileDto;
 import com.filesharing.backend.dto.BatchDownloadRequest;
 import com.filesharing.backend.dto.RenameFileRequest;
+import com.filesharing.backend.dto.MoveFileRequest;
 import com.filesharing.backend.model.FileEntity;
 import com.filesharing.backend.security.UserDetailsImpl;
 import com.filesharing.backend.service.FileService;
@@ -42,10 +43,36 @@ public class FileController {
         
         return ResponseEntity.ok().body(fileDto);
     }
+    
+    @PostMapping("/upload/folder/{folderId}")
+    public ResponseEntity<FileDto> uploadFileToFolder(
+            @RequestParam("file") MultipartFile file,
+            @PathVariable Long folderId,
+            @AuthenticationPrincipal UserDetailsImpl userDetails) throws IOException {
+        
+        FileEntity savedFile = fileService.saveFileToFolder(file, folderId, userDetails.getId());
+        
+        FileDto fileDto = FileDto.builder()
+                .id(savedFile.getId())
+                .fileName(savedFile.getFileName())
+                .fileType(savedFile.getFileType())
+                .fileSize(savedFile.getFileSize())
+                .uploadDate(savedFile.getUploadDate())
+                .folderId(folderId)
+                .build();
+        
+        return ResponseEntity.ok().body(fileDto);
+    }
 
     @GetMapping
     public ResponseEntity<List<FileDto>> getAllFiles(@AuthenticationPrincipal UserDetailsImpl userDetails) {
         List<FileDto> files = fileService.getAllFilesByUser(userDetails.getId());
+        return ResponseEntity.ok().body(files);
+    }
+    
+    @GetMapping("/root")
+    public ResponseEntity<List<FileDto>> getFilesNotInFolder(@AuthenticationPrincipal UserDetailsImpl userDetails) {
+        List<FileDto> files = fileService.getFilesNotInFolder(userDetails.getId());
         return ResponseEntity.ok().body(files);
     }
 
@@ -93,6 +120,16 @@ public class FileController {
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
         
         FileDto updatedFile = fileService.renameFile(id, request.getNewName(), userDetails.getId());
+        return ResponseEntity.ok().body(updatedFile);
+    }
+    
+    @PutMapping("/{id}/move")
+    public ResponseEntity<FileDto> moveFile(
+            @PathVariable Long id,
+            @RequestBody MoveFileRequest request,
+            @AuthenticationPrincipal UserDetailsImpl userDetails) {
+        
+        FileDto updatedFile = fileService.moveFileToFolder(id, request.getFolderId(), userDetails.getId());
         return ResponseEntity.ok().body(updatedFile);
     }
 

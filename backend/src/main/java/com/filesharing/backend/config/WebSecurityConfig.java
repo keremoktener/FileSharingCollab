@@ -59,6 +59,7 @@ public class WebSecurityConfig {
             .csrf(csrf -> csrf
                 .ignoringRequestMatchers("/api/auth/**")
                 .ignoringRequestMatchers("/api/files/**")
+                .ignoringRequestMatchers("/api/folders/**")
             )
             .sessionManagement(session -> session
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS)

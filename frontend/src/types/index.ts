@@ -33,4 +33,51 @@ export interface FileInfo {
   uploadDate: string;
   deleted?: boolean;
   deletedAt?: string;
+  folderId?: number;
+}
+
+// Folder related types
+export interface FolderInfo {
+  id: number;
+  name: string;
+  parentId?: number;
+  createdAt: string;
+  fileCount: number;
+  subfolderCount: number;
+}
+
+export interface CreateFolderRequest {
+  name: string;
+  parentId?: number;
+}
+
+// Sharing related types
+export enum AccessType {
+  VIEW = 'VIEW',
+  COMMENT = 'COMMENT',
+  EDIT = 'EDIT'
+}
+
+export interface SharedItemInfo {
+  id: number;
+  ownerName: string;
+  sharedWithEmail?: string;
+  fileId?: number;
+  fileName?: string;
+  folderId?: number;
+  folderName?: string;
+  access: AccessType;
+  publicLink: string;
+  expiryDate?: string;
+  createdAt: string;
+  isFolder: boolean;
+}
+
+export interface ShareItemRequest {
+  fileId?: number;
+  folderId?: number;
+  userEmail?: string;
+  access: AccessType;
+  isPublic: boolean;
+  expiryDate?: string;
 } 

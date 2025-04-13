@@ -52,5 +52,3 @@ This document outlines the security measures implemented in the File Sharing App
 - **Rate Limiting**: API rate limiting should be implemented to prevent brute force attacks.
 - **Multi-Factor Authentication**: Future versions will support MFA for additional security.
 - **Audit Logging**: More comprehensive audit logging for security events.
-
-If you discover any security vulnerabilities, please responsibly disclose them to the development team. 

@@ -1,14 +1,26 @@
 import React, { useState } from 'react';
-import { FileInfo } from '../types';
+import { FileInfo, FolderInfo } from '../types';
 import { fileService } from '../services/api';
 import toast from 'react-hot-toast';
+import { Download, Trash, Edit, Share, Move } from 'react-feather';
 
 interface FileListProps {
   files: FileInfo[];
   onFileAction: () => void;
+  onShare?: (file: FileInfo) => void;
+  currentFolderId?: number;
+  folders?: FolderInfo[];
+  onFileMove?: () => void;
 }
 
-const FileList: React.FC<FileListProps> = ({ files, onFileAction }) => {
+const FileList: React.FC<FileListProps> = ({ 
+  files, 
+  onFileAction, 
+  onShare,
+  currentFolderId,
+  folders = [],
+  onFileMove
+}) => {
   const [viewingFile, setViewingFile] = useState<FileInfo | null>(null);
   const [viewingContent, setViewingContent] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -18,6 +30,9 @@ const FileList: React.FC<FileListProps> = ({ files, onFileAction }) => {
   const [fileExtension, setFileExtension] = useState<string>('');
   const [selectedFiles, setSelectedFiles] = useState<Set<number>>(new Set());
   const [isProcessingBatch, setIsProcessingBatch] = useState<boolean>(false);
+  const [showMoveModal, setShowMoveModal] = useState<boolean>(false);
+  const [fileToMove, setFileToMove] = useState<FileInfo | null>(null);
+  const [targetFolderId, setTargetFolderId] = useState<number | null>(null);
 
   const toggleFileSelection = (id: number) => {
     const newSelection = new Set(selectedFiles);
@@ -177,6 +192,37 @@ const FileList: React.FC<FileListProps> = ({ files, onFileAction }) => {
     }
   };
 
+  const handleShare = (file: FileInfo) => {
+    if (onShare) {
+      onShare(file);
+    }
+  };
+
+  const openMoveModal = (file: FileInfo) => {
+    setFileToMove(file);
+    setTargetFolderId(file.folderId || null);
+    setShowMoveModal(true);
+  };
+
+  const handleMoveFile = async () => {
+    if (!fileToMove) return;
+
+    try {
+      await fileService.moveFile(fileToMove.id, targetFolderId !== null ? targetFolderId : undefined);
+      toast.success('File moved successfully');
+      setShowMoveModal(false);
+      
+      if (onFileMove) {
+        onFileMove();
+      } else {
+        onFileAction();
+      }
+    } catch (error) {
+      console.error('Error moving file:', error);
+      toast.error('Failed to move file');
+    }
+  };
+
   // Format file size to human-readable format
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0B';
@@ -202,391 +248,226 @@ const FileList: React.FC<FileListProps> = ({ files, onFileAction }) => {
       return { type: 'Video', color: 'bg-purple-100 text-purple-800' };
     } else if (mimeType.startsWith('audio/')) {
       return { type: 'Audio', color: 'bg-green-100 text-green-800' };
+    } else if (mimeType === 'application/zip' || mimeType === 'application/x-zip-compressed') {
+      return { type: 'Archive', color: 'bg-yellow-100 text-yellow-800' };
     } else if (mimeType.startsWith('text/')) {
       return { type: 'Text', color: 'bg-gray-100 text-gray-800' };
     } else {
-      return { type: 'Document', color: 'bg-yellow-100 text-yellow-800' };
+      return { type: 'Document', color: 'bg-indigo-100 text-indigo-800' };
     }
   };
 
-  // Determine if a file is viewable in browser
-  const isViewable = (fileType: string): boolean => {
-    const viewableTypes = [
-      'image/jpeg', 
-      'image/png', 
-      'image/gif', 
-      'application/pdf', 
-      'text/plain', 
-      'text/html',
-      'video/mp4',
-      'audio/mpeg'
-    ];
-    return viewableTypes.includes(fileType);
+  // Get a folder name by its ID
+  const getFolderName = (folderId: number | undefined | null): string => {
+    if (!folderId) return 'Root';
+    const folder = folders.find(f => f.id === folderId);
+    return folder ? folder.name : 'Unknown folder';
   };
 
-  // Get file icon based on type
-  const getFileIcon = (fileType: string) => {
-    if (fileType.startsWith('image/')) {
-      return (
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-          <circle cx="8.5" cy="8.5" r="1.5"></circle>
-          <path d="M21 15l-5-5L5 21"></path>
-        </svg>
-      );
-    } else if (fileType === 'application/pdf') {
-      return (
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-          <path d="M14 2v6h6"></path>
-          <path d="M16 13H8"></path>
-          <path d="M16 17H8"></path>
-          <path d="M10 9H8"></path>
-        </svg>
-      );
-    } else if (fileType.startsWith('video/')) {
-      return (
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-purple-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M23 7l-7 5 7 5V7z"></path>
-          <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
-        </svg>
-      );
-    } else if (fileType.startsWith('audio/')) {
-      return (
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M9 18V5l12-2v13"></path>
-          <circle cx="6" cy="18" r="3"></circle>
-          <circle cx="18" cy="16" r="3"></circle>
-        </svg>
-      );
-    } else {
-      return (
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-          <path d="M14 2v6h6"></path>
-          <path d="M16 13H8"></path>
-          <path d="M16 17H8"></path>
-          <path d="M10 9H8"></path>
-        </svg>
-      );
-    }
-  };
-
-  const getFileNameWithoutExtension = (fileName: string): string => {
-    const lastDotIndex = fileName.lastIndexOf('.');
-    if (lastDotIndex === -1) return fileName;
-    return fileName.substring(0, lastDotIndex);
-  };
-
-  const getFileExtension = (fileName: string): string => {
-    const lastDotIndex = fileName.lastIndexOf('.');
-    if (lastDotIndex === -1) return '';
-    return fileName.substring(lastDotIndex);
-  };
-
-  const startRenaming = (file: FileInfo) => {
-    setEditingId(file.id);
-    const nameWithoutExtension = getFileNameWithoutExtension(file.fileName);
-    const extension = getFileExtension(file.fileName);
-    setNewFileName(nameWithoutExtension);
-    setFileExtension(extension);
-  };
-
-  const handleRename = async (fileId: number) => {
-    if (!newFileName.trim()) {
-      toast.error('File name cannot be empty');
-      return;
-    }
-
-    try {
-      setRenamingId(fileId);
-      // Add extension back when sending to server
-      const fullFileName = newFileName + fileExtension;
-      console.log('Sending rename request for file ID:', fileId, 'New name:', fullFileName);
-      await fileService.renameFile(fileId, fullFileName);
-      toast.success('File renamed successfully');
-      setEditingId(null);
-      onFileAction(); // Refresh file list
-    } catch (error: any) {
-      console.error('Error renaming file:', error);
-      if (error.response) {
-        console.error('Response status:', error.response.status);
-        console.error('Response data:', error.response.data);
-      }
-      toast.error('Failed to rename file');
-    } finally {
-      setRenamingId(null);
-      setFileExtension('');
-    }
-  };
-
-  const cancelRenaming = () => {
-    setEditingId(null);
-    setNewFileName('');
-    setFileExtension('');
-  };
-
-  // Add truncate function
-  const truncateFileName = (fileName: string, maxLength: number = 18): string => {
-    if (fileName.length <= maxLength) return fileName;
-    return fileName.substring(0, maxLength - 3) + '...';
-  };
-
+  // Main render function
   if (files.length === 0) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8 text-center">
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto text-gray-300 dark:text-gray-600 mb-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto text-gray-400 dark:text-gray-500 mb-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
           <path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"></path>
           <path d="M13 2v7h7"></path>
         </svg>
-        <p className="text-gray-500 dark:text-gray-400 mb-2">No files uploaded yet</p>
-        <p className="text-sm text-gray-400 dark:text-gray-500">Upload files using the section above</p>
+        <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-2">No files yet</h3>
+        <p className="text-gray-500 dark:text-gray-400 mb-6">Upload some files to get started!</p>
       </div>
     );
   }
 
   return (
     <>
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden transition-all mb-4">
-        <div className="p-4 md:p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-          <div>
-            <h2 className="text-xl font-bold text-gray-800 dark:text-white">Your Files</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage and view your uploaded files</p>
-          </div>
-          {selectedFiles.size > 0 && (
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden">
+        {/* File list header with batch actions */}
+        <div className="p-5 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+          <div className="flex flex-col sm:flex-row justify-between items-center space-y-3 sm:space-y-0">
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                checked={selectedFiles.size === files.length && files.length > 0}
+                onChange={toggleAllFiles}
+                className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-500"
+              />
+              <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
+                {selectedFiles.size} of {files.length} selected
+              </span>
+            </div>
             <div className="flex space-x-2">
               <button
                 onClick={handleBatchDownload}
-                disabled={isProcessingBatch}
-                className="px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed text-sm flex items-center"
+                disabled={selectedFiles.size === 0 || isProcessingBatch}
+                className={`px-3 py-1.5 text-xs rounded font-medium 
+                  ${selectedFiles.size === 0 || isProcessingBatch
+                    ? 'bg-gray-300 text-gray-500 dark:bg-gray-700 dark:text-gray-400 cursor-not-allowed'
+                    : 'bg-blue-500 text-white hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700'
+                  } transition-colors flex items-center`}
               >
-                {isProcessingBatch ? (
-                  <svg className="animate-spin h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                ) : (
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path>
-                    <polyline points="7 10 12 15 17 10"></polyline>
-                    <line x1="12" y1="15" x2="12" y2="3"></line>
-                  </svg>
-                )}
-                Download ({selectedFiles.size})
+                <Download size={14} className="mr-1" />
+                Download Selected
               </button>
               <button
                 onClick={handleBatchDelete}
-                disabled={isProcessingBatch}
-                className="px-3 py-1.5 bg-red-600 text-white rounded hover:bg-red-700 transition-colors disabled:bg-red-400 disabled:cursor-not-allowed text-sm flex items-center"
+                disabled={selectedFiles.size === 0 || isProcessingBatch}
+                className={`px-3 py-1.5 text-xs rounded font-medium 
+                  ${selectedFiles.size === 0 || isProcessingBatch
+                    ? 'bg-gray-300 text-gray-500 dark:bg-gray-700 dark:text-gray-400 cursor-not-allowed'
+                    : 'bg-red-500 text-white hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700'
+                  } transition-colors flex items-center`}
               >
-                {isProcessingBatch ? (
-                  <svg className="animate-spin h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                ) : (
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polyline points="3 6 5 6 21 6"></polyline>
-                    <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path>
-                  </svg>
-                )}
-                Delete ({selectedFiles.size})
+                <Trash size={14} className="mr-1" />
+                Delete Selected
               </button>
             </div>
-          )}
+          </div>
         </div>
-        <div className="overflow-hidden">
-          <table className="w-full divide-y divide-gray-200 dark:divide-gray-700 table-fixed">
-            <thead className="bg-gray-50 dark:bg-gray-700">
+
+        {/* Table of files */}
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead className="bg-gray-50 dark:bg-gray-800">
               <tr>
-                <th scope="col" className="w-10 pl-4 pr-2 py-3 text-left">
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 text-blue-600 rounded border-gray-300 dark:border-gray-600"
-                      checked={selectedFiles.size === files.length && files.length > 0}
-                      onChange={toggleAllFiles}
-                    />
-                  </div>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-10">
+                  <span className="sr-only">Select</span>
                 </th>
-                <th scope="col" className="w-56 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   File
                 </th>
-                <th scope="col" className="w-24 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Type
                 </th>
-                <th scope="col" className="w-20 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Size
                 </th>
-                <th scope="col" className="w-36 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Upload Date
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Folder
                 </th>
-                <th scope="col" className="w-72 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Uploaded
+                </th>
+                <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              {files.map((file, index) => {
+            <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
+              {files.map((file) => {
                 const fileTypeInfo = getFileType(file.fileType);
-                const isViewable = isViewableFile(file.fileType);
+                
                 return (
-                  <tr 
-                    key={file.id} 
-                    className={`${index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-900'} hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-150`}
-                  >
-                    <td className="pl-4 pr-2 py-4 whitespace-nowrap">
+                  <tr key={file.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <input
+                        type="checkbox"
+                        checked={selectedFiles.has(file.id)}
+                        onChange={() => toggleFileSelection(file.id)}
+                        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-500"
+                      />
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <input
-                          type="checkbox"
-                          className="h-4 w-4 text-blue-600 rounded border-gray-300 dark:border-gray-600"
-                          checked={selectedFiles.has(file.id)}
-                          onChange={() => toggleFileSelection(file.id)}
-                        />
+                        <button
+                          onClick={() => handleView(file)}
+                          className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 flex items-center"
+                        >
+                          {file.fileName}
+                        </button>
                       </div>
                     </td>
-                    <td className="px-3 py-4">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0 h-10 w-10 rounded bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
-                          {getFileIcon(file.fileType)}
-                        </div>
-                        <div className="ml-4 flex-1 min-w-0">
-                          {editingId === file.id ? (
-                            <div className="flex items-center">
-                              <input
-                                type="text"
-                                value={newFileName}
-                                onChange={(e) => setNewFileName(e.target.value)}
-                                className="text-sm font-medium text-gray-900 dark:text-white bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 mr-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-32"
-                                autoFocus
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    handleRename(file.id);
-                                  } else if (e.key === 'Escape') {
-                                    cancelRenaming();
-                                  }
-                                }}
-                              />
-                              {fileExtension && (
-                                <span className="text-sm text-gray-500 dark:text-gray-400 mr-2">
-                                  {fileExtension}
-                                </span>
-                              )}
-                              <div className="flex">
-                                <button
-                                  onClick={() => handleRename(file.id)}
-                                  disabled={renamingId === file.id}
-                                  className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 mr-2"
-                                  title="Save"
-                                >
-                                  {renamingId === file.id ? (
-                                    <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
-                                  ) : (
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                      <polyline points="20 6 9 17 4 12"></polyline>
-                                    </svg>
-                                  )}
-                                </button>
-                                <button
-                                  onClick={cancelRenaming}
-                                  className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                                  title="Cancel"
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                                  </svg>
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div 
-                              className="text-sm font-medium text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer group flex items-center truncate" 
-                              onClick={() => startRenaming(file)} 
-                              title={getFileNameWithoutExtension(file.fileName)}
-                            >
-                              {truncateFileName(getFileNameWithoutExtension(file.fileName))}
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1.5 opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 dark:text-gray-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                              </svg>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-3 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${fileTypeInfo.color}`}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${fileTypeInfo.color}`}>
                         {fileTypeInfo.type}
                       </span>
                     </td>
-                    <td className="px-3 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-500 dark:text-gray-400">{formatFileSize(file.fileSize)}</div>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      {formatFileSize(file.fileSize)}
                     </td>
-                    <td className="px-3 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-500 dark:text-gray-400">{formatDate(file.uploadDate)}</div>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      {getFolderName(file.folderId)}
                     </td>
-                    <td className="px-3 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex items-center space-x-3">
-                        {isViewable ? (
-                          <button
-                            onClick={() => handleView(file)}
-                            className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 transition-colors group flex items-center w-20 flex-shrink-0"
-                            title="View file"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                              <circle cx="12" cy="12" r="3"></circle>
-                            </svg>
-                            <span className="ml-1 group-hover:underline">View</span>
-                          </button>
-                        ) : (
-                          <span className="text-gray-400 dark:text-gray-500 flex items-center opacity-50 w-20 flex-shrink-0" title="Preview not available">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                              <circle cx="12" cy="12" r="3"></circle>
-                              <line x1="1" y1="1" x2="23" y2="23"></line>
-                            </svg>
-                            <span className="ml-1">-</span>
-                          </span>
-                        )}
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      {formatDate(file.uploadDate)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <div className="flex justify-end space-x-2">
                         <button
                           onClick={() => handleDownload(file.id, file.fileName)}
-                          className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 transition-colors group flex items-center w-28 flex-shrink-0"
-                          title="Download file"
+                          className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-200"
+                          title="Download"
                         >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path>
-                            <polyline points="7 10 12 15 17 10"></polyline>
-                            <line x1="12" y1="15" x2="12" y2="3"></line>
-                          </svg>
-                          <span className="ml-1 group-hover:underline">Download</span>
+                          <Download size={18} />
                         </button>
+                        
+                        {onShare && (
+                          <button
+                            onClick={() => handleShare(file)}
+                            className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-200"
+                            title="Share"
+                          >
+                            <Share size={18} />
+                          </button>
+                        )}
+                        
+                        <button
+                          onClick={() => openMoveModal(file)}
+                          className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-200"
+                          title="Move to folder"
+                        >
+                          <Move size={18} />
+                        </button>
+                        
+                        {renamingId === file.id ? (
+                          <div className="flex items-center">
+                            <input
+                              type="text"
+                              value={newFileName}
+                              onChange={(e) => setNewFileName(e.target.value)}
+                              className="border rounded py-1 px-2 text-sm w-32 mr-1"
+                              autoFocus
+                            />
+                            <button 
+                              onClick={() => {
+                                // Handle rename logic
+                                setRenamingId(null);
+                              }}
+                              className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-200"
+                            >
+                              ✓
+                            </button>
+                            <button 
+                              onClick={() => setRenamingId(null)}
+                              className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-200 ml-1"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setRenamingId(file.id);
+                              setNewFileName(getFileNameWithoutExtension(file.fileName));
+                              setFileExtension(getFileExtension(file.fileName));
+                            }}
+                            className="text-yellow-600 hover:text-yellow-900 dark:text-yellow-400 dark:hover:text-yellow-200"
+                            title="Rename"
+                          >
+                            <Edit size={18} />
+                          </button>
+                        )}
+                        
                         <button
                           onClick={() => handleDelete(file.id)}
                           disabled={deletingId === file.id}
-                          className={`transition-colors group flex items-center w-20 flex-shrink-0 ${
-                            deletingId === file.id ? 'text-gray-400 dark:text-gray-500 cursor-not-allowed' : 'text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300'
+                          className={`${
+                            deletingId === file.id
+                              ? 'text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                              : 'text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-200'
                           }`}
-                          title="Delete file"
+                          title="Delete"
                         >
-                          {deletingId === file.id ? (
-                            <svg className="animate-spin h-5 w-5 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                          ) : (
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <polyline points="3 6 5 6 21 6"></polyline>
-                              <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path>
-                              <line x1="10" y1="11" x2="10" y2="17"></line>
-                              <line x1="14" y1="11" x2="14" y2="17"></line>
-                            </svg>
-                          )}
-                          <span className="ml-1 group-hover:underline">Delete</span>
+                          <Trash size={18} />
                         </button>
                       </div>
                     </td>
@@ -597,102 +478,116 @@ const FileList: React.FC<FileListProps> = ({ files, onFileAction }) => {
           </table>
         </div>
       </div>
-      
-      {/* File viewer modal */}
+
+      {/* File Preview Modal */}
       {viewingFile && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 animate-fadeIn">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 max-w-5xl w-full max-h-[90vh] flex flex-col relative">
-            <div className="flex justify-between items-center mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
-              <div className="flex items-center space-x-3">
-                {getFileIcon(viewingFile.fileType)}
-                <h3 className="text-lg font-bold text-gray-800 dark:text-white">{getFileNameWithoutExtension(viewingFile.fileName)}</h3>
-                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getFileType(viewingFile.fileType).color}`}>
-                  {getFileType(viewingFile.fileType).type}
-                </span>
-              </div>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col">
+            <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="font-medium truncate max-w-md">{viewingFile.fileName}</h3>
               <button 
-                onClick={closePreview} 
-                className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors focus:outline-none"
+                onClick={closePreview}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                &times;
               </button>
             </div>
-            <div className="flex-1 overflow-auto bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
-              {viewingFile.fileType.startsWith('image/') ? (
-                <img 
-                  src={viewingContent || ''} 
-                  alt={viewingFile.fileName} 
-                  className="max-w-full max-h-[70vh] mx-auto rounded-lg shadow-md"
-                />
-              ) : viewingFile.fileType === 'application/pdf' ? (
-                <iframe 
-                  src={viewingContent || ''}
-                  className="w-full h-[70vh] rounded-lg shadow-md"
-                  title={viewingFile.fileName}
-                />
-              ) : viewingFile.fileType.startsWith('video/') ? (
-                <video 
-                  src={viewingContent || ''} 
-                  controls 
-                  className="max-w-full max-h-[70vh] mx-auto rounded-lg shadow-md"
-                />
-              ) : viewingFile.fileType.startsWith('audio/') ? (
-                <div className="p-8 bg-white dark:bg-gray-800 rounded-lg shadow-md max-w-2xl mx-auto">
-                  <div className="text-center mb-4">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto text-blue-500 mb-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M9 18V5l12-2v13"></path>
-                      <circle cx="6" cy="18" r="3"></circle>
-                      <circle cx="18" cy="16" r="3"></circle>
-                    </svg>
-                    <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300">Audio Player</h3>
-                  </div>
-                  <audio 
-                    src={viewingContent || ''} 
-                    controls 
-                    className="w-full"
+            <div className="p-4 overflow-auto flex-grow">
+              {viewingContent ? (
+                viewingFile.fileType.startsWith('image/') ? (
+                  <img src={viewingContent} alt={viewingFile.fileName} className="max-w-full max-h-[70vh] mx-auto" />
+                ) : viewingFile.fileType.startsWith('video/') ? (
+                  <video controls className="max-w-full max-h-[70vh] mx-auto">
+                    <source src={viewingContent} type={viewingFile.fileType} />
+                    Your browser does not support the video tag.
+                  </video>
+                ) : viewingFile.fileType.startsWith('audio/') ? (
+                  <audio controls className="w-full mt-4">
+                    <source src={viewingContent} type={viewingFile.fileType} />
+                    Your browser does not support the audio tag.
+                  </audio>
+                ) : viewingFile.fileType === 'application/pdf' ? (
+                  <iframe 
+                    src={viewingContent} 
+                    title={viewingFile.fileName}
+                    className="w-full h-[70vh]"
                   />
-                </div>
+                ) : (
+                  <div className="text-center p-12">
+                    <p className="text-gray-500 dark:text-gray-400">Preview not available for this file type.</p>
+                    <button
+                      onClick={() => handleDownload(viewingFile.id, viewingFile.fileName)}
+                      className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                    >
+                      Download Instead
+                    </button>
+                  </div>
+                )
               ) : (
-                <div className="p-8 bg-white dark:bg-gray-800 rounded-lg shadow-md max-w-2xl mx-auto text-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto text-gray-400 dark:text-gray-500 mb-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path>
-                    <path d="M14 2v6h6"></path>
-                    <path d="M16 13H8"></path>
-                    <path d="M16 17H8"></path>
-                    <path d="M10 9H8"></path>
-                  </svg>
-                  <p className="text-gray-700 dark:text-gray-300 mb-4">This file type cannot be previewed directly in the browser.</p>
-                  <button
-                    onClick={() => handleDownload(viewingFile.id, viewingFile.fileName)}
-                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors inline-flex items-center"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path>
-                      <polyline points="7 10 12 15 17 10"></polyline>
-                      <line x1="12" y1="15" x2="12" y2="3"></line>
-                    </svg>
-                    Download to view
-                  </button>
+                <div className="flex justify-center items-center h-64">
+                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
                 </div>
               )}
             </div>
-            <div className="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700 flex justify-between">
+            <div className="border-t border-gray-200 dark:border-gray-700 p-4 flex justify-between items-center bg-gray-50 dark:bg-gray-800">
               <div className="text-sm text-gray-500 dark:text-gray-400">
-                <span className="font-medium">Size:</span> {formatFileSize(viewingFile.fileSize)} &bull; 
-                <span className="font-medium ml-2">Uploaded:</span> {formatDate(viewingFile.uploadDate)}
+                {formatFileSize(viewingFile.fileSize)} • {formatDate(viewingFile.uploadDate)}
               </div>
               <button
                 onClick={() => handleDownload(viewingFile.id, viewingFile.fileName)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors inline-flex items-center text-sm"
+                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors flex items-center"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path>
-                  <polyline points="7 10 12 15 17 10"></polyline>
-                  <line x1="12" y1="15" x2="12" y2="3"></line>
-                </svg>
+                <Download size={16} className="mr-2" />
                 Download
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Move File Modal */}
+      {showMoveModal && fileToMove && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg max-w-md w-full">
+            <h2 className="text-xl font-bold mb-4">Move File</h2>
+            <p className="mb-4 text-gray-600 dark:text-gray-300">
+              Move <span className="font-semibold">{fileToMove.fileName}</span> to:
+            </p>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Select destination folder:
+              </label>
+              <select
+                value={targetFolderId || ""}
+                onChange={(e) => setTargetFolderId(e.target.value ? parseInt(e.target.value) : null)}
+                className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
+              >
+                <option value="">Root (No folder)</option>
+                {folders.map(folder => (
+                  <option 
+                    key={folder.id} 
+                    value={folder.id}
+                    disabled={folder.id === fileToMove.folderId}
+                  >
+                    {folder.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => setShowMoveModal(false)}
+                className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleMoveFile}
+                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+              >
+                Move
               </button>
             </div>
           </div>
@@ -702,19 +597,15 @@ const FileList: React.FC<FileListProps> = ({ files, onFileAction }) => {
   );
 };
 
-// Function to determine if a file is viewable in browser
-const isViewableFile = (fileType: string): boolean => {
-  const viewableTypes = [
-    'image/jpeg', 
-    'image/png', 
-    'image/gif', 
-    'application/pdf', 
-    'text/plain', 
-    'text/html',
-    'video/mp4',
-    'audio/mpeg'
-  ];
-  return viewableTypes.includes(fileType);
+// Helper functions
+const getFileNameWithoutExtension = (fileName: string): string => {
+  const lastDotIndex = fileName.lastIndexOf('.');
+  return lastDotIndex !== -1 ? fileName.substring(0, lastDotIndex) : fileName;
+};
+
+const getFileExtension = (fileName: string): string => {
+  const lastDotIndex = fileName.lastIndexOf('.');
+  return lastDotIndex !== -1 ? fileName.substring(lastDotIndex) : '';
 };
 
 export default FileList;

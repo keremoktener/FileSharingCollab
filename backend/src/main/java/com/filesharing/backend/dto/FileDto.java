@@ -18,4 +18,5 @@ public class FileDto {
     private LocalDateTime uploadDate;
     private boolean deleted;
     private LocalDateTime deletedAt;
+    private Long folderId;
 } 
