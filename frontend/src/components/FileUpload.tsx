@@ -1,13 +1,21 @@
 import React, { useState, useRef, DragEvent } from 'react';
 import { fileService } from '../services/api';
 import toast from 'react-hot-toast';
+import { Upload } from 'react-feather';
 
 interface FileUploadProps {
   onFileUploaded: () => void;
   currentFolderId?: number;
+  buttonClassName?: string;
+  buttonContent?: React.ReactNode;
 }
 
-const FileUpload: React.FC<FileUploadProps> = ({ onFileUploaded, currentFolderId }) => {
+const FileUpload: React.FC<FileUploadProps> = ({ 
+  onFileUploaded, 
+  currentFolderId, 
+  buttonClassName,
+  buttonContent
+}) => {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
@@ -125,6 +133,38 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUploaded, currentFolderId
       );
     }
   };
+
+  // If the component is used with the simplified button style
+  if (buttonClassName) {
+    return (
+      <>
+        <input
+          ref={fileInputRef}
+          type="file"
+          onChange={(e) => {
+            handleFileChange(e);
+            if (e.target.files && e.target.files[0]) {
+              setTimeout(() => handleUpload(), 0);
+            }
+          }}
+          className="hidden"
+          disabled={uploading}
+        />
+        <button
+          onClick={handleButtonClick}
+          disabled={uploading}
+          className={buttonClassName}
+        >
+          {buttonContent || (
+            <>
+              <Upload size={18} className="mr-2" />
+              Upload
+            </>
+          )}
+        </button>
+      </>
+    );
+  }
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8 transform transition-all">

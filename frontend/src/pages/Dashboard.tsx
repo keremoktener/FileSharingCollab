@@ -9,7 +9,11 @@ import ShareModal from '../components/ShareModal';
 import SharedItemList from '../components/SharedItemList';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
-import { FolderPlus, ChevronRight, Home, Share, Folder, File } from 'react-feather';
+import { 
+  FolderPlus, ChevronRight, Home, Share, Folder, File, Grid, List, 
+  Menu, Search, Star, Clock, Users, Settings, Download, Upload, ExternalLink, Database, UserPlus, Share2, LogOut
+} from 'react-feather';
+import ThemeToggle from '../components/ThemeToggle';
 
 // Maximum storage limit in bytes (10GB)
 const MAX_STORAGE = 10 * 1024 * 1024 * 1024;
@@ -19,6 +23,12 @@ enum ViewMode {
   FILES,
   SHARED_WITH_ME,
   SHARED_BY_ME
+}
+
+// Display mode enum
+enum DisplayMode {
+  GRID,
+  LIST
 }
 
 const Dashboard: React.FC = () => {
@@ -31,6 +41,9 @@ const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0); // Used to trigger skeleton refresh
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.FILES);
+  const [displayMode, setDisplayMode] = useState<DisplayMode>(DisplayMode.GRID);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   
   // Modals
   const [showCreateFolderModal, setShowCreateFolderModal] = useState(false);
@@ -224,281 +237,312 @@ const Dashboard: React.FC = () => {
     return 'bg-red-500';
   };
 
+  // Filter folders and files by search query
+  const filteredFolders = folders.filter(folder => 
+    folder.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+  
+  const filteredFiles = files.filter(file => 
+    file.fileName.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Modify the handleLogout function
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    window.location.href = '/login'; // Redirect to login page
+  };
+
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
-      <div className="animate-fadeIn">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-2">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">My Files</h1>
-            <p className="text-gray-600 dark:text-gray-300 mt-1">
-              Upload, download, and manage your files securely
-            </p>
-          </div>
-          
-          {/* Quick stats */}
-          <div className="grid grid-cols-3 gap-4 mt-4 md:mt-0">
-            <div 
-              className={`bg-white dark:bg-gray-800 shadow rounded-xl p-3 text-center transition-all duration-300 hover:shadow-md transform cursor-pointer ${viewMode === ViewMode.FILES ? 'border-2 border-blue-500' : ''}`}
-              onClick={() => setViewMode(ViewMode.FILES)}
-            >
-              <File className="h-5 w-5 mx-auto text-blue-600 dark:text-blue-400 mb-1" />
-              <p className="text-sm text-gray-500 dark:text-gray-400">My Files</p>
-            </div>
-            <div 
-              className={`bg-white dark:bg-gray-800 shadow rounded-xl p-3 text-center transition-all duration-300 hover:shadow-md transform cursor-pointer ${viewMode === ViewMode.SHARED_WITH_ME ? 'border-2 border-blue-500' : ''}`}
-              onClick={() => setViewMode(ViewMode.SHARED_WITH_ME)}
-            >
-              <Share className="h-5 w-5 mx-auto text-green-600 dark:text-green-400 mb-1" />
-              <p className="text-sm text-gray-500 dark:text-gray-400">Shared with me</p>
-            </div>
-            <div 
-              className={`bg-white dark:bg-gray-800 shadow rounded-xl p-3 text-center transition-all duration-300 hover:shadow-md transform cursor-pointer ${viewMode === ViewMode.SHARED_BY_ME ? 'border-2 border-blue-500' : ''}`}
-              onClick={() => setViewMode(ViewMode.SHARED_BY_ME)}
-            >
-              <Share className="h-5 w-5 mx-auto text-purple-600 dark:text-purple-400 mb-1" />
-              <p className="text-sm text-gray-500 dark:text-gray-400">Shared by me</p>
-            </div>
-          </div>
+    <div className="flex h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden">
+      {/* Sidebar */}
+      <div className={`bg-blue-700 dark:bg-blue-800 shadow-lg transition-all duration-300 ease-in-out ${isSidebarOpen ? 'w-64' : 'w-20'} flex flex-col`}>
+        <div className="p-4 flex items-center justify-between border-b border-blue-600 dark:border-blue-700">
+          <h1 className={`text-xl font-bold text-white transition-opacity duration-200 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 w-0 overflow-hidden'}`}>
+            FileShare
+          </h1>
+          <button 
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)} 
+            className="p-2 rounded-md hover:bg-blue-600 dark:hover:bg-blue-700 text-white"
+          >
+            <Menu size={20} />
+          </button>
         </div>
         
-        {/* Storage usage bar (only show in Files view) */}
-        {viewMode === ViewMode.FILES && (
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-md mt-4 transition-all duration-300 hover:shadow-lg">
-            <div className="flex justify-between mb-2">
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Storage Usage</span>
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                {formatTotalSize(totalSize)} / {formatTotalSize(MAX_STORAGE)}
-              </span>
-            </div>
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
-              <div 
-                className={`h-2.5 rounded-full transition-all duration-1000 ease-out ${getUsageColor()}`} 
-                style={{ width: `${Math.min(usagePercentage, 100)}%` }}
-              ></div>
-            </div>
-            <div className="flex justify-between mt-1">
-              <span className="text-xs text-gray-500 dark:text-gray-400">
-                {usagePercentage.toFixed(1)}% used
-              </span>
-              <span className="text-xs text-gray-500 dark:text-gray-400">
-                {formatTotalSize(MAX_STORAGE - totalSize)} free
-              </span>
-            </div>
-          </div>
-        )}
+        <div className="text-xs uppercase text-blue-200 font-semibold px-4 pt-4 pb-2">
+          VIEWS
+        </div>
         
-        {/* Welcome message (only show in Files view) */}
-        {viewMode === ViewMode.FILES && (
-          <div className="bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-800 text-white rounded-xl p-6 shadow-lg mb-8 mt-6 flex items-center transition-all duration-300 hover:shadow-xl transform hover:scale-[1.01]">
-            <div className="mr-4">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"></path>
-                <path d="M13 2v7h7"></path>
-              </svg>
-            </div>
-            <div>
-              <h2 className="text-xl font-bold">Welcome back, {user?.username || 'User'}!</h2>
-              <p className="opacity-80 mt-1">Your personal cloud storage is ready. Upload files to get started.</p>
-            </div>
+        <nav className="flex-1 p-4 space-y-1">
+          <button 
+            onClick={() => setViewMode(ViewMode.FILES)}
+            className={`flex items-center w-full p-3 rounded-lg transition-all ${viewMode === ViewMode.FILES ? 'bg-blue-800 dark:bg-blue-900 text-white' : 'text-blue-100 dark:text-blue-100 hover:bg-blue-600 dark:hover:bg-blue-700'}`}
+          >
+            <File size={20} className="flex-shrink-0" />
+            <span className={`ml-3 transition-all ${isSidebarOpen ? 'opacity-100' : 'opacity-0 w-0 overflow-hidden'}`}>My Files</span>
+          </button>
+          
+          <button 
+            onClick={() => setViewMode(ViewMode.SHARED_WITH_ME)}
+            className={`flex items-center w-full p-3 rounded-lg transition-all ${viewMode === ViewMode.SHARED_WITH_ME ? 'bg-blue-800 dark:bg-blue-900 text-white' : 'text-blue-100 dark:text-blue-100 hover:bg-blue-600 dark:hover:bg-blue-700'}`}
+          >
+            <Share size={20} className="flex-shrink-0" />
+            <span className={`ml-3 transition-all ${isSidebarOpen ? 'opacity-100' : 'opacity-0 w-0 overflow-hidden'}`}>Shared with Me</span>
+          </button>
+          
+          <button 
+            onClick={() => setViewMode(ViewMode.SHARED_BY_ME)}
+            className={`flex items-center w-full p-3 rounded-lg transition-all ${viewMode === ViewMode.SHARED_BY_ME ? 'bg-blue-800 dark:bg-blue-900 text-white' : 'text-blue-100 dark:text-blue-100 hover:bg-blue-600 dark:hover:bg-blue-700'}`}
+          >
+            <ExternalLink size={20} className="flex-shrink-0" />
+            <span className={`ml-3 transition-all ${isSidebarOpen ? 'opacity-100' : 'opacity-0 w-0 overflow-hidden'}`}>Shared by Me</span>
+          </button>
+        </nav>
+        
+        <div className="text-xs uppercase text-blue-200 font-semibold px-4 pt-4 pb-2">
+          STORAGE
+        </div>
+        
+        {/* Storage usage indicator */}
+        <div className={`p-4 ${isSidebarOpen ? '' : 'hidden'}`}>
+          <p className="text-sm text-blue-100 dark:text-blue-100 mb-1 flex justify-between">
+            <span>Used Storage</span>
+            <span>{formatTotalSize(totalSize)} / {formatTotalSize(MAX_STORAGE)}</span>
+          </p>
+          <div className="w-full h-2 bg-blue-800 dark:bg-blue-900 rounded-full overflow-hidden">
+            <div 
+              className={`h-full ${getUsageColor()} transition-all duration-500 ease-out`}
+              style={{ width: `${Math.min(usagePercentage, 100)}%` }}
+            />
           </div>
-        )}
+        </div>
       </div>
-
-      {/* Main content based on view mode */}
-      {viewMode === ViewMode.FILES ? (
-        <>
-          {/* Breadcrumbs */}
-          <div className="flex items-center text-sm text-gray-600 dark:text-gray-400 mb-4">
-            <button
-              onClick={() => navigateToRoot()}
-              className="flex items-center hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
-            >
-              <Home size={16} className="mr-1" />
-              <span>Home</span>
-            </button>
-            
-            {breadcrumbs.map((folder, index) => (
-              <React.Fragment key={folder.id}>
-                <ChevronRight size={16} className="mx-2" />
-                <button
-                  onClick={() => handleBreadcrumbClick(index)}
-                  className="hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
-                >
-                  {folder.name}
-                </button>
-              </React.Fragment>
-            ))}
-            
-            {currentFolder && (
-              <>
-                <ChevronRight size={16} className="mx-2" />
-                <span className="font-medium text-blue-500 dark:text-blue-400">{currentFolder.name}</span>
-              </>
-            )}
-          </div>
-
-          {/* Action buttons */}
-          <div className="flex flex-wrap gap-4 mb-6">
-            <button
-              onClick={() => setShowCreateFolderModal(true)}
-              className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md shadow transition-colors"
-            >
-              <FolderPlus size={18} className="mr-2" />
-              New Folder
-            </button>
-            
-            <FileUpload 
-              onFileUploaded={loadFiles} 
-              currentFolderId={currentFolder?.id} 
-            />
-          </div>
-
-          {/* Folder list */}
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-gray-800 dark:text-white flex items-center">
-                <div className="rounded-md p-1.5 bg-yellow-100 dark:bg-yellow-900/30 mr-2">
-                  <Folder size={20} className="text-yellow-500 dark:text-yellow-400" />
-                </div>
-                {currentFolder ? `Folders in ${currentFolder.name}` : 'Folders'}
-              </h2>
-              
-              <button
-                onClick={() => setShowCreateFolderModal(true)}
-                className="text-sm flex items-center text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-              >
-                <FolderPlus size={16} className="mr-1" />
-                New Folder
-              </button>
+      
+      {/* Main content */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Header */}
+        <header className="bg-blue-600 dark:bg-blue-700 shadow-md px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <div className="flex items-center mr-4">
+                <svg className="h-8 w-8 text-white mr-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M4 22H20C21.1046 22 22 21.1046 22 20V8L16 2H4C2.89543 2 2 2.89543 2 4V20C2 21.1046 2.89543 22 4 22Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M14 2V8H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <div className="text-white text-xl font-semibold">File Sharing Platform</div>
+              </div>
             </div>
             
-            <FolderList 
-              folders={folders}
-              onFolderAction={loadFolders}
-              onFolderClick={handleFolderClick}
-              onShare={handleShareFolder}
-              currentFolder={currentFolder}
-            />
+            <div className="flex items-center space-x-4">
+              <div className="relative max-w-md w-64">
+                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                  <Search size={18} className="text-blue-200 dark:text-blue-300" />
+                </div>
+                <input 
+                  type="search" 
+                  className="block w-full pl-10 pr-3 py-2 border border-blue-500 dark:border-blue-600 rounded-lg bg-blue-500/50 dark:bg-blue-600/50 text-white placeholder-blue-200 dark:placeholder-blue-300 focus:ring-white focus:border-white"
+                  placeholder="Search files and folders..." 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setDisplayMode(DisplayMode.GRID)}
+                  className={`p-2 rounded-md ${displayMode === DisplayMode.GRID ? 'bg-blue-700 dark:bg-blue-800 text-white' : 'text-blue-100 dark:text-blue-200 hover:bg-blue-700 dark:hover:bg-blue-800'}`}
+                  aria-label="Grid view"
+                >
+                  <Grid size={20} />
+                </button>
+                
+                <button
+                  onClick={() => setDisplayMode(DisplayMode.LIST)}
+                  className={`p-2 rounded-md ${displayMode === DisplayMode.LIST ? 'bg-blue-700 dark:bg-blue-800 text-white' : 'text-blue-100 dark:text-blue-200 hover:bg-blue-700 dark:hover:bg-blue-800'}`}
+                  aria-label="List view"
+                >
+                  <List size={20} />
+                </button>
+                
+                <ThemeToggle />
+              </div>
+              
+              <div className="flex items-center space-x-2 text-white">
+                <span>Hello, {user?.email.split('@')[0]}</span>
+                <div className="h-8 w-8 bg-blue-800 rounded-full flex items-center justify-center">
+                  {user?.email.substring(0, 2).toUpperCase()}
+                </div>
+                <button 
+                  onClick={handleLogout}
+                  className="ml-2 px-3 py-1 bg-blue-700 hover:bg-blue-800 rounded text-sm font-medium"
+                >
+                  Logout
+                </button>
+              </div>
+            </div>
           </div>
-
-          {/* File list */}
-          {loading ? (
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-              <div className="animate-pulse space-y-4">
-                <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/4 mb-6"></div>
-                <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                <div className="grid grid-cols-6 gap-4">
-                  <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded col-span-1"></div>
-                  <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded col-span-1"></div>
-                  <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded col-span-1"></div>
-                  <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded col-span-2"></div>
-                  <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded col-span-1"></div>
+        </header>
+        
+        {/* Main workspace */}
+        <main className="flex-1 overflow-auto bg-gray-100 dark:bg-gray-900 p-6">
+          {viewMode === ViewMode.FILES ? (
+            <div className="space-y-6">
+              {/* Breadcrumbs */}
+              <div className="flex items-center space-x-2 text-sm">
+                <button
+                  onClick={() => navigateToRoot()}
+                  className={`flex items-center px-3 py-1.5 rounded-md ${!currentFolder ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                >
+                  <Home size={16} className="mr-1.5" />
+                  <span>Home</span>
+                </button>
+                
+                {breadcrumbs.map((folder, index) => (
+                  <React.Fragment key={folder.id}>
+                    <ChevronRight size={16} className="text-gray-400 dark:text-gray-500" />
+                    <button
+                      onClick={() => handleBreadcrumbClick(index)}
+                      className="px-3 py-1.5 rounded-md text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      {folder.name}
+                    </button>
+                  </React.Fragment>
+                ))}
+                
+                {currentFolder && (
+                  <>
+                    <ChevronRight size={16} className="text-gray-400 dark:text-gray-500" />
+                    <span className="px-3 py-1.5 rounded-md bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
+                      {currentFolder.name}
+                    </span>
+                  </>
+                )}
+              </div>
+              
+              {/* Actions bar */}
+              <div className="flex flex-wrap items-center gap-3 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm">
+                <FileUpload 
+                  onFileUploaded={loadFiles} 
+                  currentFolderId={currentFolder?.id}
+                  buttonClassName="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md shadow transition-colors"
+                  buttonContent={<>
+                    <Upload size={18} className="mr-2" />
+                    Upload File
+                  </>}
+                />
+                
+                <button
+                  onClick={() => setShowCreateFolderModal(true)}
+                  className="flex items-center px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-md shadow-sm transition-colors"
+                >
+                  <FolderPlus size={18} className="mr-2" />
+                  New Folder
+                </button>
+                
+                <div className="ml-auto flex items-center text-sm text-gray-500 dark:text-gray-400">
+                  {filteredFolders.length} folders • {filteredFiles.length} files
                 </div>
-                <div className="space-y-2">
-                  {[1, 2, 3].map((item) => (
-                    <div key={`skeleton-${item}-${refreshKey}`} className="h-16 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                  ))}
-                </div>
+              </div>
+              
+              {/* Sections */}
+              <div className="space-y-6">
+                {/* Folders section */}
+                <section>
+                  <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4 flex items-center">
+                    <Folder size={20} className="mr-2 text-yellow-500 dark:text-yellow-400" />
+                    Folders
+                  </h2>
+                  
+                  <FolderList 
+                    folders={filteredFolders}
+                    onFolderAction={loadFolders}
+                    onFolderClick={handleFolderClick}
+                    onShare={handleShareFolder}
+                    currentFolder={currentFolder}
+                    displayMode={displayMode}
+                  />
+                </section>
+                
+                {/* Files section */}
+                <section>
+                  <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4 flex items-center">
+                    <File size={20} className="mr-2 text-blue-500 dark:text-blue-400" />
+                    Files
+                  </h2>
+                  
+                  <FileList 
+                    files={filteredFiles}
+                    onFileAction={loadFiles}
+                    onShare={handleShareFile}
+                    currentFolderId={currentFolder?.id}
+                    folders={folders}
+                    onFileMove={loadFiles}
+                    displayMode={displayMode}
+                  />
+                </section>
               </div>
             </div>
           ) : (
-            <div className="transition-all duration-300 ease-in-out transform">
-              <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-4 flex items-center">
-                <File size={20} className="mr-2 text-blue-500" />
-                {currentFolder ? `Files in ${currentFolder.name}` : 'Files'}
-              </h2>
+            <div className="space-y-6">
+              <h1 className="text-2xl font-bold text-gray-800 dark:text-white">
+                {viewMode === ViewMode.SHARED_WITH_ME ? 'Shared with Me' : 'Shared by Me'}
+              </h1>
               
-              <FileList 
-                files={files} 
-                onFileAction={loadFiles} 
-                onShare={handleShareFile}
-                currentFolderId={currentFolder?.id}
-                folders={folders}
-                onFileMove={loadFiles}
+              <div className="flex items-center gap-4 mb-4">
+                <button
+                  onClick={() => setDisplayMode(DisplayMode.GRID)}
+                  className={`p-2 rounded-md ${displayMode === DisplayMode.GRID ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                  aria-label="Grid view"
+                >
+                  <Grid size={20} />
+                </button>
+                
+                <button
+                  onClick={() => setDisplayMode(DisplayMode.LIST)}
+                  className={`p-2 rounded-md ${displayMode === DisplayMode.LIST ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                  aria-label="List view"
+                >
+                  <List size={20} />
+                </button>
+              </div>
+              
+              <SharedItemList 
+                items={viewMode === ViewMode.SHARED_WITH_ME ? sharedWithMe : sharedByMe} 
+                refreshItems={loadSharedItems}
+                displayMode={displayMode}
               />
             </div>
           )}
-        </>
-      ) : (
-        /* Shared Items View */
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-          <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-6 flex items-center">
-            <Share size={20} className="mr-2 text-green-500" />
-            {viewMode === ViewMode.SHARED_WITH_ME ? 'Shared with me' : 'Shared by me'}
-          </h2>
-          
-          <SharedItemList 
-            items={viewMode === ViewMode.SHARED_WITH_ME ? sharedWithMe : sharedByMe} 
-            isSharedByMe={viewMode === ViewMode.SHARED_BY_ME}
-            onItemAction={loadSharedItems}
-          />
-        </div>
+        </main>
+      </div>
+      
+      {/* Modals */}
+      {showCreateFolderModal && (
+        <CreateFolderModal
+          onClose={() => setShowCreateFolderModal(false)}
+          onFolderCreated={() => {
+            loadFolders();
+            setShowCreateFolderModal(false);
+          }}
+          parentFolderId={currentFolder?.id}
+        />
       )}
       
-      {/* Help section */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mt-8 transition-all duration-300 hover:shadow-xl">
-        <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-4">File Sharing Tips</h2>
-        <div className="grid md:grid-cols-3 gap-6">
-          <div className="flex transition-all duration-300 hover:translate-y-[-2px]">
-            <div className="mr-3 flex-shrink-0">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                <path d="M21 15l-5-5L5 21"></path>
-              </svg>
-            </div>
-            <div>
-              <h3 className="font-medium text-gray-800 dark:text-gray-200">Supported Files</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Upload images, documents, videos, and more. Max size: 10MB per file.</p>
-            </div>
-          </div>
-          <div className="flex transition-all duration-300 hover:translate-y-[-2px]">
-            <div className="mr-3 flex-shrink-0">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                <circle cx="12" cy="12" r="3"></circle>
-              </svg>
-            </div>
-            <div>
-              <h3 className="font-medium text-gray-800 dark:text-gray-200">Preview Files</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Click 'View' to preview images, PDFs, videos, and audio directly in your browser.</p>
-            </div>
-          </div>
-          <div className="flex transition-all duration-300 hover:translate-y-[-2px]">
-            <div className="mr-3 flex-shrink-0">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-              </svg>
-            </div>
-            <div>
-              <h3 className="font-medium text-gray-800 dark:text-gray-200">Secure Storage</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">All files are securely stored and only accessible by you.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Modals */}
-      <CreateFolderModal 
-        isOpen={showCreateFolderModal}
-        onClose={() => setShowCreateFolderModal(false)}
-        onFolderCreated={() => {
-          loadFolders();
-          toast.success('Folder created successfully');
-        }}
-        currentFolder={currentFolder}
-      />
-      
-      <ShareModal
-        isOpen={showShareModal}
-        onClose={() => setShowShareModal(false)}
-        onShare={() => {
-          loadSharedItems();
-          toast.success('Item shared successfully');
-        }}
-        item={itemToShare}
-        isFolder={isShareFolder}
-      />
+      {showShareModal && itemToShare && (
+        <ShareModal 
+          onClose={() => {
+            setShowShareModal(false);
+            setItemToShare(null);
+          }}
+          itemId={itemToShare.id}
+          isFolder={isShareFolder}
+          onShareCompleted={() => {
+            setShowShareModal(false);
+            setItemToShare(null);
+            toast.success('Item shared successfully');
+          }}
+        />
+      )}
     </div>
   );
 };

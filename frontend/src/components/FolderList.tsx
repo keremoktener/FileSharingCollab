@@ -2,7 +2,13 @@ import React, { useState } from 'react';
 import { FolderInfo } from '../types';
 import { folderService } from '../services/api';
 import toast from 'react-hot-toast';
-import { FolderPlus, Folder, MoreVertical, Download, Trash, Share, ChevronRight } from 'react-feather';
+import { FolderPlus, Folder, MoreVertical, Download, Trash, Share, ChevronRight, Calendar, File as FileIcon } from 'react-feather';
+
+// Display mode enum (matching Dashboard component)
+enum DisplayMode {
+  GRID,
+  LIST
+}
 
 interface FolderListProps {
   folders: FolderInfo[];
@@ -10,6 +16,7 @@ interface FolderListProps {
   onFolderClick: (folderId: number) => void;
   onShare: (folder: FolderInfo) => void;
   currentFolder?: FolderInfo | null;
+  displayMode?: DisplayMode;
 }
 
 const FolderList: React.FC<FolderListProps> = ({ 
@@ -17,7 +24,8 @@ const FolderList: React.FC<FolderListProps> = ({
   onFolderAction, 
   onFolderClick,
   onShare,
-  currentFolder 
+  currentFolder,
+  displayMode = DisplayMode.GRID
 }) => {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<boolean>(false);
@@ -96,119 +104,204 @@ const FolderList: React.FC<FolderListProps> = ({
     );
   }
 
-  return (
-    <>
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-        {folders.map((folder) => (
-          <div 
-            key={folder.id} 
-            className={`relative bg-white dark:bg-gray-800 rounded-md shadow-md p-5 
-              hover:shadow-lg hover:scale-105 transform transition-all duration-200 cursor-pointer
-              border border-gray-100 dark:border-gray-700
-              ${currentFolder?.id === folder.id 
-                ? 'ring-2 ring-blue-500 dark:ring-blue-400' 
-                : ''
-              }`}
-            onClick={() => {
-              onFolderClick(folder.id);
-              closeDropdown();
-            }}
-          >
-            {/* Folder Icon and Name */}
-            <div className="flex items-center mb-3 relative">
-              <div className="rounded-md p-2 bg-yellow-100 dark:bg-yellow-900/30 mr-3">
-                <Folder className="h-6 w-6 text-yellow-500 dark:text-yellow-400" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="text-lg font-medium truncate text-gray-800 dark:text-gray-200" title={folder.name}>
-                  {folder.name}
-                </h3>
-              </div>
+  // Grid view (default card layout)
+  const renderGridView = () => (
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+      {folders.map((folder) => (
+        <div 
+          key={folder.id} 
+          className={`relative bg-white dark:bg-gray-800 rounded-md shadow-md p-5 
+            hover:shadow-lg hover:scale-105 transform transition-all duration-200 cursor-pointer
+            border border-gray-100 dark:border-gray-700
+            ${currentFolder?.id === folder.id 
+              ? 'ring-2 ring-blue-500 dark:ring-blue-400' 
+              : ''
+            }`}
+          onClick={() => {
+            onFolderClick(folder.id);
+            closeDropdown();
+          }}
+        >
+          {/* Folder Icon and Name */}
+          <div className="flex items-center mb-3 relative">
+            <div className="rounded-md p-2 bg-yellow-100 dark:bg-yellow-900/30 mr-3">
+              <Folder className="h-6 w-6 text-yellow-500 dark:text-yellow-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-lg font-medium truncate text-gray-800 dark:text-gray-200" title={folder.name}>
+                {folder.name}
+              </h3>
+            </div>
+            
+            {/* Actions Dropdown */}
+            <div className="relative">
+              <button 
+                onClick={(e) => toggleDropdown(e, folder.id)}
+                className="p-1.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                aria-label="Folder options"
+              >
+                <MoreVertical size={18} className="text-gray-500 dark:text-gray-400" />
+              </button>
               
-              {/* Actions Dropdown */}
-              <div className="relative">
-                <button 
-                  onClick={(e) => toggleDropdown(e, folder.id)}
-                  className="p-1.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                  aria-label="Folder options"
+              {activeDropdown === folder.id && (
+                <div 
+                  className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg z-10 py-1 border border-gray-100 dark:border-gray-700"
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  <MoreVertical size={18} className="text-gray-500 dark:text-gray-400" />
-                </button>
-                
-                {activeDropdown === folder.id && (
-                  <div 
-                    className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg z-10 py-1 border border-gray-100 dark:border-gray-700"
-                    onClick={(e) => e.stopPropagation()}
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDownload(folder);
+                      closeDropdown();
+                    }}
+                    className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                   >
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDownload(folder);
-                        closeDropdown();
-                      }}
-                      className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                    >
-                      <Download size={16} className="mr-2" />
-                      <span>Download</span>
-                    </button>
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onShare(folder);
-                        closeDropdown();
-                      }}
-                      className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                    >
-                      <Share size={16} className="mr-2" />
-                      <span>Share</span>
-                    </button>
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        confirmDeleteFolder(folder);
-                        closeDropdown();
-                      }}
-                      className="flex items-center w-full px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
-                    >
-                      <Trash size={16} className="mr-2" />
-                      <span>Delete</span>
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-            
-            {/* Folder Info */}
-            <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1 mb-3">
-              <div className="flex items-center">
-                <svg className="w-3 h-3 mr-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M3 5H21V19C21 20.1046 20.1046 21 19 21H5C3.89543 21 3 20.1046 3 19V5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M3 5H21V8H3V5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                <span>{folder.fileCount} {folder.fileCount === 1 ? 'file' : 'files'}</span>
-              </div>
-              <div className="flex items-center">
-                <svg className="w-3 h-3 mr-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M20 10V7C20 5.89543 19.1046 5 18 5H6C4.89543 5 4 5.89543 4 7V19C4 20.1046 4.89543 21 6 21H18C19.1046 21 20 20.1046 20 19V16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                <span>{folder.subfolderCount} {folder.subfolderCount === 1 ? 'folder' : 'folders'}</span>
-              </div>
-              <div className="flex items-center">
-                <svg className="w-3 h-3 mr-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M12 6V12L16 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                <span>Created {formatDate(folder.createdAt)}</span>
-              </div>
-            </div>
-            
-            {/* Open Indicator */}
-            <div className="absolute bottom-4 right-4">
-              <ChevronRight size={18} className="text-gray-400 dark:text-gray-500" />
+                    <Download size={16} className="mr-2" />
+                    <span>Download</span>
+                  </button>
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onShare(folder);
+                      closeDropdown();
+                    }}
+                    className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  >
+                    <Share size={16} className="mr-2" />
+                    <span>Share</span>
+                  </button>
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      confirmDeleteFolder(folder);
+                      closeDropdown();
+                    }}
+                    className="flex items-center w-full px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                  >
+                    <Trash size={16} className="mr-2" />
+                    <span>Delete</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
-        ))}
-      </div>
+          
+          {/* Folder Info */}
+          <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1 mb-3">
+            <div className="flex items-center">
+              <FileIcon size={12} className="mr-1" />
+              <span>{folder.fileCount} {folder.fileCount === 1 ? 'file' : 'files'}</span>
+            </div>
+            <div className="flex items-center">
+              <Folder size={12} className="mr-1" />
+              <span>{folder.subfolderCount} {folder.subfolderCount === 1 ? 'folder' : 'folders'}</span>
+            </div>
+            <div className="flex items-center">
+              <Calendar size={12} className="mr-1" />
+              <span>Created {formatDate(folder.createdAt)}</span>
+            </div>
+          </div>
+          
+          {/* Open Indicator */}
+          <div className="absolute bottom-4 right-4">
+            <ChevronRight size={18} className="text-gray-400 dark:text-gray-500" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
+  // List view (table layout)
+  const renderListView = () => (
+    <div className="overflow-x-auto">
+      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+        <thead className="bg-gray-50 dark:bg-gray-800">
+          <tr>
+            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              Name
+            </th>
+            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              Files
+            </th>
+            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              Subfolders
+            </th>
+            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              Created
+            </th>
+            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              Actions
+            </th>
+          </tr>
+        </thead>
+        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+          {folders.map((folder) => (
+            <tr 
+              key={folder.id}
+              className={`hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${
+                currentFolder?.id === folder.id ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+              }`}
+            >
+              <td className="px-6 py-4 whitespace-nowrap cursor-pointer" onClick={() => onFolderClick(folder.id)}>
+                <div className="flex items-center">
+                  <div className="rounded-md p-2 bg-yellow-100 dark:bg-yellow-900/30 mr-3">
+                    <Folder className="h-5 w-5 text-yellow-500 dark:text-yellow-400" />
+                  </div>
+                  <div className="text-sm font-medium text-gray-900 dark:text-white">
+                    {folder.name}
+                  </div>
+                </div>
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap">
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  {folder.fileCount}
+                </div>
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap">
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  {folder.subfolderCount}
+                </div>
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap">
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  {formatDate(folder.createdAt)}
+                </div>
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                <div className="flex justify-end space-x-2">
+                  <button
+                    onClick={() => onShare(folder)}
+                    className="text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
+                    title="Share folder"
+                  >
+                    <Share size={16} />
+                  </button>
+                  <button
+                    onClick={() => handleDownload(folder)}
+                    className="text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
+                    title="Download folder"
+                  >
+                    <Download size={16} />
+                  </button>
+                  <button
+                    onClick={() => confirmDeleteFolder(folder)}
+                    className="text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400"
+                    title="Delete folder"
+                  >
+                    <Trash size={16} />
+                  </button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+
+  return (
+    <>
+      {displayMode === DisplayMode.GRID ? renderGridView() : renderListView()}
 
       {/* Delete confirmation modal */}
       {showDeleteConfirm && folderToDelete && (

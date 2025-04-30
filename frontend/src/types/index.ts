@@ -34,6 +34,9 @@ export interface FileInfo {
   deleted?: boolean;
   deletedAt?: string;
   folderId?: number;
+  thumbnailUrl?: string;
+  modifiedAt?: string;
+  createdAt: string;
 }
 
 // Folder related types
@@ -71,6 +74,9 @@ export interface SharedItemInfo {
   expiryDate?: string;
   createdAt: string;
   isFolder: boolean;
+  name: string;
+  sharedAt: string;
+  sharedBy: string;
 }
 
 export interface ShareItemRequest {
